@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>日本のOSM更新ウォッチ｜ランキング</title>
+  <meta name="description" content="日本のOpenStreetMapで追加・編集されたタグ付きノードを、都道府県・編集者・代表タグ・日付別に集計したランキングです。">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#12634f">
+  <link rel="canonical" href="https://armd-01.sakura.ne.jp/whatsnew/ranking.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:site_name" content="日本のOSM更新ウォッチ">
+  <meta property="og:title" content="OSM更新ノードランキング｜日本のOSM更新ウォッチ">
+  <meta property="og:description" content="日本のOpenStreetMapで追加・編集されたタグ付きノードを、都道府県・編集者・代表タグ・日付別に集計したランキングです。">
+  <meta property="og:url" content="https://armd-01.sakura.ne.jp/whatsnew/ranking.html">
+  <meta property="og:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
+  <meta property="og:image:width" content="1672">
+  <meta property="og:image:height" content="941">
+  <meta property="og:image:alt" content="日本のOSM更新ウォッチ">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="OSM更新ノードランキング｜日本のOSM更新ウォッチ">
+  <meta name="twitter:description" content="日本のOSM更新ノードを、都道府県・編集者・代表タグ・日付別に確認できます。">
+  <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
+  <link rel="stylesheet" href="ranking.css">
+  <style>.ranking-date{padding:9px;border-radius:6px;border:1px solid #bac9c1;background:#fff;font:inherit}</style>
+</head>
+<body>
+  <header>
+    <div>
+      <small>OSM UPDATE WATCH JAPAN</small>
+      <h1>OSM更新ノードランキング</h1>
+    </div>
+    <nav><a href="index.html">地図へ戻る</a>　<a href="prefectures.html">都道府県別</a></nav>
+    <form id="ranking-filter">
+      <label>期間
+        <select id="ranking-days">
+          <option value="7">1週間</option>
+          <option value="14" selected>2週間</option>
+          <option value="30">1ヵ月</option>
+          <option value="183">半年</option>
+          <option value="365">1年</option>
+        </select>
+      </label>
+      <label>開始日 <input id="ranking-from" class="ranking-date" type="date" required></label>
+      <label>終了日 <input id="ranking-to" class="ranking-date" type="date" required></label>
+      <button>表示更新</button>
+    </form>
+  </header>
+  <main>
+    <p id="ranking-status">集計中…</p>
+    <p id="ranking-period" class="ranking-period"></p>
+    <p><a id="ranking-csv" href="#" hidden>ランキング一覧をCSVでダウンロード</a></p>
+    <div class="ranking-grid">
+      <section>
+        <h2>都道府県別</h2>
+        <div class="chart-wrap"><canvas id="prefecture-chart" aria-label="都道府県別の更新ノード数"></canvas></div>
+        <h3>都道府県トップ100</h3>
+        <table><thead><tr><th>順位</th><th>都道府県</th><th>更新数</th></tr></thead><tbody id="prefecture-table"></tbody></table>
+      </section>
+      <section>
+        <h2>編集アカウント別</h2>
+        <div class="chart-wrap"><canvas id="account-chart" aria-label="編集アカウント別の更新ノード数"></canvas></div>
+        <h3>編集アカウント トップ100</h3>
+        <table><thead><tr><th>順位</th><th>アカウント</th><th>更新数</th></tr></thead><tbody id="account-table"></tbody></table>
+      </section>
+      <section>
+        <h2>代表タグ別</h2>
+        <div class="chart-wrap"><canvas id="category-chart" aria-label="代表タグ別の更新ノード数"></canvas></div>
+        <h3>代表タグトップ100</h3>
+        <table><thead><tr><th>順位</th><th>代表タグ</th><th>更新数</th></tr></thead><tbody id="category-table"></tbody></table>
+      </section>
+      <section>
+        <h2>日付別</h2>
+        <div class="chart-wrap"><canvas id="daily-chart" aria-label="日付別の更新ノード数"></canvas></div>
+        <h3>日付別トップ100</h3>
+        <table><thead><tr><th>順位</th><th>日付</th><th>新規</th><th>変更</th><th>合計</th></tr></thead><tbody id="daily-table"></tbody></table>
+      </section>
+    </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+  <script src="ranking.js"></script>
+</body>
+</html>

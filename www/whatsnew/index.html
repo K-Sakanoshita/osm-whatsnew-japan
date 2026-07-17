@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>日本のOSM更新ウォッチ</title>
+  <meta name="description" content="OpenStreetMapで日本国内に追加・編集されたタグ付きノードを、地図とタイムスケールのアニメーションで確認できます。">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#12634f">
+  <link rel="canonical" href="https://armd-01.sakura.ne.jp/whatsnew/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:site_name" content="日本のOSM更新ウォッチ">
+  <meta property="og:title" content="日本のOSM更新ウォッチ">
+  <meta property="og:description" content="OpenStreetMapで日本国内に追加・編集されたタグ付きノードを、地図とタイムスケールのアニメーションで確認できます。">
+  <meta property="og:url" content="https://armd-01.sakura.ne.jp/whatsnew/">
+  <meta property="og:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
+  <meta property="og:image:width" content="1672">
+  <meta property="og:image:height" content="941">
+  <meta property="og:image:alt" content="日本のOSM更新ウォッチ">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="日本のOSM更新ウォッチ">
+  <meta name="twitter:description" content="OpenStreetMapで日本国内に追加・編集されたタグ付きノードを地図で確認できます。">
+  <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>日本のOSM更新ウォッチ</h1>
+      <small>本家OSM APIの変更セットから、追加・編集されたタグ付きノードを抽出します。</small>
+    </div>
+    <nav><a href="prefectures.html">都道府県別</a>　<a href="ranking.html">ランキング</a></nav>
+    <form id="search">
+      <label>期間
+        <select id="days">
+          <option value="1">過去1日</option>
+          <option value="7">過去1週間</option>
+          <option value="14" selected>過去2週間</option>
+          <option value="30">過去1ヵ月</option>
+          <option value="183">過去半年</option>
+          <option value="365">過去1年</option>
+        </select>
+      </label>
+      <button>表示更新</button>
+    </form>
+  </header>
+  <main>
+    <div class="map-shell">
+      <div id="map"></div>
+      <section id="timeline" class="timeline" hidden aria-label="更新時刻を選択">
+        <output id="timeline-label" for="time-range"></output>
+        <div class="timeline-dates">
+          <label><span>開始日</span><input id="date-from" type="date" required></label>
+          <label><span>終了日</span><input id="date-to" type="date" required></label>
+        </div>
+        <input id="time-range" type="range" aria-label="更新時刻">
+        <div class="timeline-ends"><span id="time-start"></span><span id="time-end"></span></div>
+        <div class="timeline-controls">
+          <label class="timeline-step-label">間隔
+            <select id="timeline-step" aria-label="タイムスケールの間隔">
+              <option value="600000">10分</option>
+              <option value="1800000">30分</option>
+              <option value="3600000" selected>1時間</option>
+              <option value="7200000">2時間</option>
+              <option value="14400000">4時間</option>
+              <option value="86400000">1日</option>
+              <option value="604800000">1週間</option>
+              <option value="1209600000">2週間</option>
+            </select>
+          </label>
+          <button id="play-timeline" type="button">▶ 再生</button>
+          <button id="pause-timeline" type="button">■ 停止</button>
+        </div>
+      </section>
+    </div>
+    <aside>
+      <p id="status">準備中…</p>
+      <ol id="list"></ol>
+    </aside>
+  </main>
+  <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
