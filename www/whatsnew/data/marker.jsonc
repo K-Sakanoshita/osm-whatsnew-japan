@@ -235,6 +235,7 @@
                 "electronics": "electronic.png",
                 "farm": "apple-alt.png",
                 "florist": "florist.png",
+                "fishing": "ice_fishing.png",
                 "frozen_food": "shop.png",
                 "funeral_directors": "cemetery.png",
                 "furniture": "furniture.png",
@@ -298,6 +299,12 @@
                 "water": "water.png",
                 "wetland": "wetland.png",
                 "wood": "park-alt1.png"
+            },
+            "noexit": {
+                "yes": "roadblock.png"
+            },
+            "ford": {
+                "yes": "water.png"
             },
             "highway": {
                 "bus_stop": "board_bus.png",

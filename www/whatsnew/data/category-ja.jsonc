@@ -231,6 +231,7 @@
             "electronics": "家電販売屋",
             "farm": "農場直売店",
             "florist": "花屋",
+            "fishing": "釣具店",
             "frozen_food": "冷凍食品専門店",
             "funeral_directors": "葬儀社",
             "furniture": "家具屋",
@@ -294,6 +295,12 @@
             "wetland": "湿地帯",
             "volcano": "火山",
             "wood": "森"
+        },
+        "noexit": {
+            "yes": "行き止まり"
+        },
+        "ford": {
+            "yes": "洗い越し（渡河点）"
         },
         "highway": {
             "bus_stop": "バス停",

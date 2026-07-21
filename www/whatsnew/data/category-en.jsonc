@@ -232,6 +232,7 @@
             "electronics": "electronic",
             "farm": "farm",
             "florist": "florist",
+            "fishing": "fishing tackle shop",
             "frozen_food": "frozen food",
             "funeral_directors": "cemetery",
             "furniture": "furniture",
@@ -295,6 +296,12 @@
             "wetland": "wetland",
             "volcano": "volcano",
             "wood": "wood"
+        },
+        "noexit": {
+            "yes": "No exit"
+        },
+        "ford": {
+            "yes": "ford"
         },
         "highway": {
             "bus_stop": "bus stop",
