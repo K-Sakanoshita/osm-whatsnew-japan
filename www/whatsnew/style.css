@@ -36,6 +36,159 @@ header h1 {
   margin: 0
 }
 
+.site-info-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer
+}
+
+.site-info-trigger svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: #397b69;
+  transition: transform .15s ease, color .15s ease
+}
+
+.site-info-trigger:hover {
+  color: #075f49
+}
+
+.site-info-trigger:hover svg {
+  color: #087f5b;
+  transform: scale(1.08)
+}
+
+.site-info-trigger:focus-visible {
+  border-radius: 4px;
+  outline: 3px solid rgba(8, 127, 91, .25);
+  outline-offset: 3px
+}
+
+.site-info-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(720px, calc(100dvh - 32px));
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #c7d8d1;
+  border-radius: 16px;
+  background: #fff;
+  color: #172423;
+  box-shadow: 0 24px 70px rgba(14, 45, 37, .28)
+}
+
+.site-info-dialog::backdrop {
+  background: rgba(13, 31, 27, .58);
+  backdrop-filter: blur(2px)
+}
+
+.site-info-dialog-content {
+  position: relative;
+  padding: 32px
+}
+
+.site-info-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #c7d8d1;
+  border-radius: 50%;
+  background: #fff;
+  color: #31564d;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer
+}
+
+.site-info-dialog-close:hover {
+  background: #edf7f3;
+  color: #075f49
+}
+
+.site-info-dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-right: 48px
+}
+
+.site-info-dialog-logo {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  object-fit: contain
+}
+
+.site-info-dialog h2 {
+  margin: 0;
+  color: #124f40;
+  font-size: 27px;
+  line-height: 1.25
+}
+
+.site-info-dialog-lead {
+  margin: 22px 0 12px;
+  font-size: 16px;
+  line-height: 1.85
+}
+
+.site-info-dialog-description {
+  margin: 0 0 22px;
+  color: #4b625c;
+  line-height: 1.75
+}
+
+.site-info-repository {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 17px 19px;
+  border: 1px solid #91b9ab;
+  border-radius: 10px;
+  background: #f0f8f5;
+  color: #075f49;
+  font-weight: 700;
+  text-decoration: none
+}
+
+.site-info-repository:hover {
+  border-color: #087f5b;
+  background: #e4f3ee
+}
+
+.site-info-repository small {
+  color: #4d6b62;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap
+}
+
+.site-info-dialog-note {
+  margin: 18px 0 0;
+  color: #60736e;
+  font-size: 12px;
+  line-height: 1.6
+}
+
 header small {
   display: block;
   color: #5c7169;
@@ -279,6 +432,48 @@ button {
   margin: 0 0 12px;
   padding: 7px;
   box-shadow: 0 2px 8px rgba(24, 54, 44, .12)
+}
+
+.map-page .poi-type-filter {
+  margin: 0 0 5px;
+  padding: 0 1px
+}
+
+.map-page .poi-type-filter label {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.map-page .poi-type-filter span {
+  display: inline;
+  flex: 0 0 auto;
+  margin: 0;
+  color: #31564d;
+  font-size: 13px;
+  font-weight: 700
+}
+
+.map-page .poi-type-filter select {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 30px 7px 9px;
+  border: 1px solid #a9c0b7;
+  border-radius: 6px;
+  background: #fff;
+  color: #183d33;
+  font: inherit;
+  font-size: 13px
+}
+
+.map-page .poi-type-filter select:focus-visible {
+  outline: 2px solid rgba(8, 127, 91, .3);
+  outline-offset: 1px
+}
+
+.map-page .poi-type-filter select:disabled {
+  background: #f0f4f2;
+  color: #84938e
 }
 
 .map-page #prefecture-mini-map {
@@ -1285,6 +1480,23 @@ button {
     height: 118px
   }
 
+  .map-page .poi-type-filter {
+    margin-bottom: 3px
+  }
+
+  .map-page .poi-type-filter label {
+    gap: 6px
+  }
+
+  .map-page .poi-type-filter span,
+  .map-page .poi-type-filter select {
+    font-size: 12px
+  }
+
+  .map-page .poi-type-filter select {
+    padding-block: 5px
+  }
+
   .map-page header,
   .details-page header {
     min-height: 70px;
@@ -1472,6 +1684,59 @@ button {
 
 /* モバイル地物ポップアップ */
 @media(max-width:700px) {
+  .site-info-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 12px
+  }
+
+  .site-info-dialog-content {
+    padding: 22px 18px
+  }
+
+  .site-info-dialog-close {
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    height: 34px
+  }
+
+  .site-info-dialog-heading {
+    gap: 11px;
+    padding-right: 36px
+  }
+
+  .site-info-dialog-logo {
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px
+  }
+
+  .site-info-dialog h2 {
+    font-size: 20px
+  }
+
+  .site-info-dialog-lead {
+    margin-top: 18px;
+    font-size: 14px;
+    line-height: 1.7
+  }
+
+  .site-info-dialog-description {
+    font-size: 13px
+  }
+
+  .site-info-repository {
+    display: block;
+    padding: 14px
+  }
+
+  .site-info-repository small {
+    display: block;
+    margin-top: 5px;
+    white-space: normal
+  }
+
   .map-page .maplibregl-popup {
     max-width: min(320px, calc(100vw - 36px)) !important
   }

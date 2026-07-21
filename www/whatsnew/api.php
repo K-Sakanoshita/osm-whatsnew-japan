@@ -102,6 +102,13 @@ try {
         $filters['editor_uid'] = $editorUidText;
     }
 
+    $editorName = $readTextFilter('editor_name', 255);
+    if ($editorName !== '') {
+        $conditions[] = 'editor_name = :editor_name';
+        $parameters['editor_name'] = $editorName;
+        $filters['editor_name'] = $editorName;
+    }
+
     $category = $readTextFilter('category', 255);
     $categoryValue = $readTextFilter('category_value', 255);
     if ($categoryValue !== '' && $category === '') {

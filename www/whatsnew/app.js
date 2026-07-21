@@ -50,6 +50,7 @@ const saveMapViewToUrl = () => {
 const status = document.querySelector('#status');
 const list = document.querySelector('#list');
 const listScroller = list;
+const poiTypeSelect = document.querySelector('#poi-type');
 const timeline = document.querySelector('#timeline');
 const range = document.querySelector('#time-range');
 const timelineLabel = document.querySelector('#timeline-label');
@@ -111,6 +112,7 @@ let highlightedListStart = 0;
 let highlightedListEnd = 0;
 let dateReloadTimer = null;
 let allPoiItems = [];
+let selectedPoiType = '';
 let prefectureFeatures = [];
 let prefectureMiniMap = null;
 let selectedPrefecture = '';
@@ -146,29 +148,67 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character =>
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 })[character]);
 
-const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-
 function downloadCurrentData() {
   const items = markerEntries.map(entry => entry.item);
   if (!items.length) return;
-  const rows = [[
-    '更新種別', '更新日時（JST）', '都道府県', '名称', 'カテゴリ', 'OSMタグ',
-    'OSM種別', 'OSM ID', '緯度', '経度', '変更セット', '更新者', '更新者ID', 'タグ（JSON）',
-  ]];
-  items.forEach(item => {
-    const tags = Object.fromEntries(Object.entries(item.tags || {}).sort(([left], [right]) => left.localeCompare(right)));
-    rows.push([
-      item.action === 'create' ? '新規' : '更新', fmt(item.date), item.prefecture || '', item.name || '',
-      item.categoryName || '', `${item.type || ''}=${item.kind || ''}`, item.osmType || 'node', item.id,
-      item.lat, item.lon, item.changeset || '', item.editorName || '', item.editorUid || '', JSON.stringify(tags),
-    ]);
-  });
-  const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
-  const url = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+  const features = items.map(item => {
+    const longitude = Number(item.lon);
+    const latitude = Number(item.lat);
+    const osmType = item.osmType || 'node';
+    return {
+      type: 'Feature',
+      id: `${osmType}/${item.id}`,
+      geometry: {
+        type: 'Point',
+        coordinates: [longitude, latitude],
+      },
+      properties: {
+        name: item.name || '',
+        prefecture: item.prefecture || '',
+        update_action: item.action || '',
+        update_action_label: item.action === 'create' ? '新規' : '更新',
+        updated_at: item.date || '',
+        updated_at_jst: fmt(item.date),
+        category: item.type || '',
+        category_value: item.kind || '',
+        category_name: item.categoryName || '',
+        osm_type: osmType,
+        osm_id: String(item.id ?? ''),
+        changeset: String(item.changeset ?? ''),
+        editor_name: item.editorName || '',
+        editor_uid: String(item.editorUid ?? ''),
+        tags: Object.fromEntries(
+          Object.entries(item.tags || {}).sort(([left], [right]) => left.localeCompare(right)),
+        ),
+      },
+    };
+  }).filter(feature => feature.geometry.coordinates.every(Number.isFinite));
+  if (!features.length) return;
+  const geojson = {
+    type: 'FeatureCollection',
+    name: 'OSM What’s New Japan',
+    metadata: {
+      generated_at: new Date().toISOString(),
+      period_from: dateFrom.value,
+      period_to: dateTo.value,
+      prefecture: selectedPrefecture || '',
+      feature_count: features.length,
+      license: 'Open Database License (ODbL) 1.0',
+      license_url: 'https://opendatacommons.org/licenses/odbl/1-0/',
+      attribution: '© OpenStreetMap contributors',
+      attribution_url: 'https://www.openstreetmap.org/copyright',
+      attribution_required: true,
+    },
+    features,
+  };
+  const url = URL.createObjectURL(new Blob(
+    [JSON.stringify(geojson, null, 2)],
+    {type: 'application/geo+json;charset=utf-8'},
+  ));
   const link = document.createElement('a');
   const area = (selectedPrefecture || 'japan').replace(/[\\/:*?"<>|]/g, '_');
   link.href = url;
-  link.download = `osm-pois_${area}_${dateFrom.value}_${dateTo.value}.csv`;
+  link.download = `osm-whatsnew_${area}_${dateFrom.value}_${dateTo.value}.geojson`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -329,6 +369,62 @@ function filterPoiItems(feature) {
   });
 }
 
+const poiTypeKey = item => JSON.stringify([
+  String(item.type ?? ''),
+  String(item.kind ?? ''),
+]);
+
+const excludedPoiTypeTags = new Set([
+  'name',
+  'ele',
+  'addr:block_number',
+  'source',
+  'access',
+  'check_date',
+  'cuisine',
+  'bath:type',
+]);
+
+function updatePoiTypeOptions(items) {
+  const optionsByKey = new Map();
+  items.forEach(item => {
+    if (excludedPoiTypeTags.has(String(item.type ?? '').trim())) return;
+    const key = poiTypeKey(item);
+    const current = optionsByKey.get(key);
+    if (current) {
+      current.count++;
+      return;
+    }
+    const tag = `${item.type || '—'}=${item.kind || '—'}`;
+    optionsByKey.set(key, {
+      key,
+      label: item.categoryName || tag,
+      tag,
+      count: 1,
+    });
+  });
+
+  const options = [...optionsByKey.values()].sort((left, right) => (
+    left.label.localeCompare(right.label, 'ja')
+      || left.tag.localeCompare(right.tag)
+  ));
+  poiTypeSelect.replaceChildren();
+  const allOption = document.createElement('option');
+  allOption.value = '';
+  allOption.textContent = `すべての種別（${items.length.toLocaleString('ja-JP')}件）`;
+  poiTypeSelect.append(allOption);
+  options.forEach(entry => {
+    const option = document.createElement('option');
+    option.value = entry.key;
+    option.textContent = `${entry.label}（${entry.tag}・${entry.count.toLocaleString('ja-JP')}件）`;
+    poiTypeSelect.append(option);
+  });
+
+  if (!optionsByKey.has(selectedPoiType)) selectedPoiType = '';
+  poiTypeSelect.value = selectedPoiType;
+  poiTypeSelect.disabled = items.length === 0;
+}
+
 async function applyPrefectureFilter(fitMap = false) {
   const feature = selectedPrefectureFeature();
   updatePrefectureMiniMapSelection();
@@ -336,7 +432,11 @@ async function applyPrefectureFilter(fitMap = false) {
     const box = prefectureBounds(feature);
     map.fitBounds([[box[0], box[1]], [box[2], box[3]]], {padding: 42, duration: 350, maxZoom: 9});
   }
-  const filteredItems = filterPoiItems(feature);
+  const areaItems = filterPoiItems(feature);
+  updatePoiTypeOptions(areaItems);
+  const filteredItems = selectedPoiType
+    ? areaItems.filter(item => poiTypeKey(item) === selectedPoiType)
+    : areaItems;
   await show(filteredItems);
   if (!filteredItems.length) {
     const area = selectedPrefecture || '全国';
@@ -1026,6 +1126,7 @@ async function load() {
   status.hidden = false;
   status.textContent = '保存済みデータを読み込み中…';
   list.innerHTML = '';
+  poiTypeSelect.disabled = true;
   timeline.hidden = true;
   clearMarkers();
   try {
@@ -1131,6 +1232,19 @@ prefectureFilterReset.addEventListener('click', () => {
   updatePrefectureMiniMapSelection();
   resetSharedTimelineTime();
   load();
+});
+
+poiTypeSelect.addEventListener('change', async () => {
+  const currentTime = timeline.hidden ? NaN : Number(range.value);
+  selectedPoiType = poiTypeSelect.value;
+  if (Number.isFinite(currentTime)) pendingSharedTime = currentTime;
+  try {
+    await applyPrefectureFilter(false);
+    pauseTimeline();
+  } catch (error) {
+    status.hidden = false;
+    status.textContent = `種別を変更できませんでした: ${error.message}`;
+  }
 });
 
 function showShareFeedback(label, stateClass, statusText, duration = 1800) {
