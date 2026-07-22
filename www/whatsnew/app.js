@@ -23,6 +23,7 @@ const validDateParameter = value => {
     && parsed.getMonth() === month - 1
     && parsed.getDate() === day;
 };
+const requestedDaysValue = mapPageUrl.searchParams.get('days') || '';
 const requestedDateFrom = mapPageUrl.searchParams.get('from') || '';
 const requestedDateTo = mapPageUrl.searchParams.get('to') || '';
 const requestedStepValue = STEP_PARAMETER_TO_VALUE[mapPageUrl.searchParams.get('step')] || '';
@@ -30,7 +31,11 @@ const rawPrefectureCode = (mapPageUrl.searchParams.get('pref') || '').toUpperCas
 const requestedPrefectureCode = /^JP-\d{2}$/.test(rawPrefectureCode) ? rawPrefectureCode : '';
 const requestedTimeValue = Date.parse(mapPageUrl.searchParams.get('time') || '');
 let pendingSharedTime = Number.isFinite(requestedTimeValue) ? requestedTimeValue : null;
-let urlStateReady = false;
+if (mapPageUrl.search) {
+  const cleanUrl = new URL(mapPageUrl);
+  cleanUrl.search = '';
+  window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.hash);
+}
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -43,9 +48,6 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
-const saveMapViewToUrl = () => {
-  if (urlStateReady) syncViewStateToUrl();
-};
 
 const status = document.querySelector('#status');
 const list = document.querySelector('#list');
@@ -61,6 +63,7 @@ const playButton = document.querySelector('#play-timeline');
 const pauseButton = document.querySelector('#pause-timeline');
 const timelineStep = document.querySelector('#timeline-step');
 const days = document.querySelector('#days');
+if ([...days.options].some(option => option.value === requestedDaysValue)) days.value = requestedDaysValue;
 const dateFrom = document.querySelector('#date-from');
 const dateTo = document.querySelector('#date-to');
 const prefectureFilterReset = document.querySelector('#prefecture-filter-reset');
@@ -78,6 +81,15 @@ let playbackStartTimer = null;
 let playbackFrame = null;
 let isPlaying = false;
 let activeListItem = null;
+let activeListEntryIndex = -1;
+const VIRTUAL_LIST_ROW_HEIGHT = 72;
+const VIRTUAL_LIST_OVERSCAN = 10;
+const RENDER_CHUNK_SIZE = 1000;
+let virtualListStart = -1;
+let virtualListEnd = -1;
+let virtualListFrame = null;
+let activeLoadController = null;
+let loadVersion = 0;
 const POPUP_OFFSETS = {
   top: [0, 8],
   'top-left': [8, 8],
@@ -110,6 +122,8 @@ let visibleListCount = 0;
 let clusterVisibleCount = -1;
 let highlightedListStart = 0;
 let highlightedListEnd = 0;
+let listTargetVisibleCount = 0;
+let listScrollAnimationFrame = null;
 let dateReloadTimer = null;
 let allPoiItems = [];
 let selectedPoiType = '';
@@ -212,8 +226,8 @@ function downloadCurrentData() {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-async function json(url) {
-  const response = await fetch(url);
+async function json(url, signal) {
+  const response = await fetch(url, {signal});
   const text = await response.text();
   let data;
   try {
@@ -267,7 +281,7 @@ function selectedPrefectureFeature() {
   return prefectureFeatures.find(feature => prefectureName(feature) === selectedPrefecture) || null;
 }
 
-function syncViewStateToUrl({includeTime = false, updateHistory = true} = {}) {
+function buildCurrentViewUrl({includeTime = false} = {}) {
   const url = new URL(window.location.href);
   const center = map.getCenter();
   url.searchParams.set('lat', center.lat.toFixed(5));
@@ -278,6 +292,9 @@ function syncViewStateToUrl({includeTime = false, updateHistory = true} = {}) {
   if (code) url.searchParams.set('pref', code);
   else if (!prefectureStateReady && requestedPrefectureCode) url.searchParams.set('pref', requestedPrefectureCode);
   else url.searchParams.delete('pref');
+
+  if (days.value) url.searchParams.set('days', days.value);
+  else url.searchParams.delete('days');
 
   if (validDateParameter(dateFrom.value)) url.searchParams.set('from', dateFrom.value);
   else url.searchParams.delete('from');
@@ -297,13 +314,11 @@ function syncViewStateToUrl({includeTime = false, updateHistory = true} = {}) {
   } else {
     url.searchParams.delete('time');
   }
-  if (updateHistory) window.history.replaceState(null, '', url);
   return url;
 }
 
 function resetSharedTimelineTime() {
   pendingSharedTime = null;
-  syncViewStateToUrl({includeTime: false});
 }
 
 function ensureMainPrefectureLayers() {
@@ -526,9 +541,9 @@ async function initializePrefectureMiniMap() {
   });
 }
 
-async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '') {
-  const pageSize = 1000;
-  const maximumRequests = 50;
+async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '', signal) {
+  const pageSize = 5000;
+  const maximumRequests = 10;
   const rows = [];
   let cursor = '';
   for (let request = 1; request <= maximumRequests; request++) {
@@ -541,7 +556,7 @@ async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '') 
     });
     if (prefectureValue) query.set('prefecture', prefectureValue);
     if (cursor) query.set('cursor', cursor);
-    const data = await json(`api.php?${query}`);
+    const data = await json(`api.php?${query}`, signal);
     const batch = Array.isArray(data.items) ? data.items : [];
     rows.push(...batch);
     status.textContent = `${rows.length.toLocaleString('ja-JP')}件を読み込み中…`;
@@ -599,6 +614,7 @@ function clearMarkers() {
   pauseTimeline();
   osmPopup.remove();
   activeListItem = null;
+  activeListEntryIndex = -1;
   if (map.getSource(POI_SOURCE)) {
     map.getSource(POI_SOURCE).setData({type: 'FeatureCollection', features: []});
   }
@@ -612,6 +628,12 @@ function clearMarkers() {
   clusterVisibleCount = -1;
   highlightedListStart = 0;
   highlightedListEnd = 0;
+  listTargetVisibleCount = 0;
+  if (listScrollAnimationFrame !== null) {
+    cancelAnimationFrame(listScrollAnimationFrame);
+    listScrollAnimationFrame = null;
+  }
+  resetVirtualList();
 }
 
 function pauseTimeline() {
@@ -729,20 +751,197 @@ function updateClusterData(visible, force = false) {
   clusterVisibleCount = visible;
 }
 
+const waitForNextPaint = () => new Promise(resolve => requestAnimationFrame(resolve));
+
+function resetVirtualList() {
+  if (virtualListFrame !== null) {
+    cancelAnimationFrame(virtualListFrame);
+    virtualListFrame = null;
+  }
+  virtualListStart = -1;
+  virtualListEnd = -1;
+  list.replaceChildren();
+  list.scrollTop = 0;
+}
+
+function createVirtualListSpacer(height) {
+  const spacer = document.createElement('li');
+  spacer.className = 'virtual-list-spacer';
+  spacer.style.height = `${Math.max(0, height)}px`;
+  spacer.setAttribute('aria-hidden', 'true');
+  return spacer;
+}
+
+function createListItem(entry, index) {
+  const {item} = entry;
+  const li = document.createElement('li');
+  li.dataset.entryIndex = String(index);
+  const editorLabel = item.editorName
+    ? `${item.editorName}${item.editorUid ? ` (${item.editorUid})` : ''}`
+    : '編集者不明';
+  const editor = item.editorName
+    ? `<a class="editor-link" href="https://www.openstreetmap.org/user/${encodeURIComponent(item.editorName)}" target="_blank" rel="noopener noreferrer">${escapeHtml(editorLabel)}</a>`
+    : editorLabel;
+  li.innerHTML = `<div class="list-title"><img class="list-icon" src="icon/${encodeURIComponent(item.icon)}" alt=""><strong>${escapeHtml(item.name)}</strong></div><span>${escapeHtml(item.categoryName)} · ${fmt(item.date)} · ${editor}</span>`;
+  li.classList.toggle('is-highlighted', index >= highlightedListStart && index < highlightedListEnd);
+  li.classList.toggle('is-selected', index === activeListEntryIndex);
+  entry.listItem = li;
+  if (index === activeListEntryIndex) activeListItem = li;
+  return li;
+}
+
+function renderVirtualList(force = false) {
+  virtualListFrame = null;
+  const visible = Math.min(visibleListCount, markerEntries.length);
+  if (visible <= 0) {
+    for (let index = virtualListStart; index < virtualListEnd; index++) {
+      if (markerEntries[index]) markerEntries[index].listItem = null;
+    }
+    activeListItem = null;
+    list.replaceChildren();
+    virtualListStart = 0;
+    virtualListEnd = 0;
+    return;
+  }
+
+  const viewportHeight = Math.max(list.clientHeight, VIRTUAL_LIST_ROW_HEIGHT * 8);
+  const start = Math.max(0, Math.floor(list.scrollTop / VIRTUAL_LIST_ROW_HEIGHT) - VIRTUAL_LIST_OVERSCAN);
+  const end = Math.min(
+    visible,
+    Math.ceil((list.scrollTop + viewportHeight) / VIRTUAL_LIST_ROW_HEIGHT) + VIRTUAL_LIST_OVERSCAN,
+  );
+  if (!force && start === virtualListStart && end === virtualListEnd) return;
+
+  for (let index = virtualListStart; index < virtualListEnd; index++) {
+    if (markerEntries[index]) markerEntries[index].listItem = null;
+  }
+  activeListItem = null;
+
+  const fragment = document.createDocumentFragment();
+  if (start > 0) fragment.append(createVirtualListSpacer(start * VIRTUAL_LIST_ROW_HEIGHT));
+  for (let index = start; index < end; index++) {
+    fragment.append(createListItem(markerEntries[index], index));
+  }
+  if (end < visible) {
+    fragment.append(createVirtualListSpacer((visible - end) * VIRTUAL_LIST_ROW_HEIGHT));
+  }
+  list.replaceChildren(fragment);
+  virtualListStart = start;
+  virtualListEnd = end;
+}
+
+function scheduleVirtualListRender() {
+  if (virtualListFrame !== null) return;
+  virtualListFrame = requestAnimationFrame(() => renderVirtualList(false));
+}
+
+function cancelListScrollAnimation() {
+  if (listScrollAnimationFrame === null) return;
+  cancelAnimationFrame(listScrollAnimationFrame);
+  listScrollAnimationFrame = null;
+}
+
+function listAppendAnimationDuration(itemCount) {
+  return Math.min(1400, 360 + Math.log2(Math.max(1, itemCount)) * 130);
+}
+
+function animateListToTarget() {
+  cancelListScrollAnimation();
+  const startCount = visibleListCount;
+  const endCount = listTargetVisibleCount;
+  if (endCount <= startCount) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    visibleListCount = endCount;
+    scrollListToVisiblePoi(endCount);
+    return;
+  }
+
+  const itemCount = endCount - startCount;
+  const duration = listAppendAnimationDuration(itemCount);
+  const startedAt = performance.now();
+  const startScrollTop = Math.max(0, startCount * VIRTUAL_LIST_ROW_HEIGHT - listScroller.clientHeight);
+  listScroller.scrollTop = startScrollTop;
+  renderVirtualList(true);
+
+  const frame = now => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const exactCount = startCount + itemCount * progress;
+    const revealedCount = Math.min(endCount, Math.ceil(exactCount));
+    if (revealedCount !== visibleListCount) {
+      visibleListCount = revealedCount;
+      renderVirtualList(true);
+    }
+    listScroller.scrollTop = Math.max(
+      0,
+      exactCount * VIRTUAL_LIST_ROW_HEIGHT - listScroller.clientHeight,
+    );
+    if (progress < 1) {
+      listScrollAnimationFrame = requestAnimationFrame(frame);
+      return;
+    }
+    visibleListCount = endCount;
+    listScroller.scrollTop = Math.max(
+      0,
+      endCount * VIRTUAL_LIST_ROW_HEIGHT - listScroller.clientHeight,
+    );
+    renderVirtualList(true);
+    listScrollAnimationFrame = null;
+    if (listTargetVisibleCount > endCount) animateListToTarget();
+  };
+  listScrollAnimationFrame = requestAnimationFrame(frame);
+}
+
+function setListVisibleTarget(target) {
+  if (target === listTargetVisibleCount) return;
+  listTargetVisibleCount = target;
+  cancelListScrollAnimation();
+  if (target <= visibleListCount) {
+    visibleListCount = target;
+    scrollListToVisiblePoi(target);
+    return;
+  }
+  animateListToTarget();
+}
+
+list.addEventListener('scroll', scheduleVirtualListRender, {passive: true});
+list.addEventListener('click', event => {
+  if (event.target.closest?.('a')) return;
+  const listItem = event.target.closest?.('li[data-entry-index]');
+  if (!listItem) return;
+  const index = Number(listItem.dataset.entryIndex);
+  const entry = markerEntries[index];
+  if (!entry) return;
+  map.jumpTo({center: [entry.item.lon, entry.item.lat], zoom: 16});
+  showOsmMenu(entry, false);
+});
+list.addEventListener('error', event => {
+  const image = event.target.closest?.('.list-icon');
+  if (image && !image.src.endsWith('/marker-stroked.png')) image.src = 'icon/marker-stroked.png';
+}, true);
+
+function scrollListToEntry(index) {
+  if (!listScroller || index < 0 || index >= listTargetVisibleCount) return;
+  if (index >= visibleListCount) {
+    cancelListScrollAnimation();
+    visibleListCount = listTargetVisibleCount;
+  }
+  // Build the spacers first so scrollTop can reach an entry that was not
+  // represented in the previous virtual window.
+  renderVirtualList(true);
+  const targetTop = index * VIRTUAL_LIST_ROW_HEIGHT
+    - (listScroller.clientHeight - VIRTUAL_LIST_ROW_HEIGHT) / 2;
+  listScroller.scrollTop = Math.max(0, targetTop);
+  renderVirtualList(true);
+}
+
 function scrollListToVisiblePoi(visible) {
   if (!listScroller) return;
   if (visible <= 0) {
     listScroller.scrollTop = 0;
+    renderVirtualList(true);
     return;
   }
-  const target = markerEntries[visible - 1]?.listItem;
-  if (!target) return;
-  const scrollerRect = listScroller.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  const targetTop = listScroller.scrollTop
-    + targetRect.top - scrollerRect.top
-    - (listScroller.clientHeight - targetRect.height) / 2;
-  listScroller.scrollTop = Math.max(0, targetTop);
+  scrollListToEntry(visible - 1);
 }
 
 function updateHighlight() {
@@ -757,37 +956,22 @@ function updateHighlight() {
   }
   updateClusterData(visible);
 
-  if (visible !== visibleListCount) {
-    const start = Math.min(visible, visibleListCount);
-    const end = Math.max(visible, visibleListCount);
-    for (let index = start; index < end; index++) {
-      markerEntries[index].listItem.classList.toggle('is-future', index >= visible);
-    }
-    scrollListToVisiblePoi(visible);
-    visibleListCount = visible;
-  }
-
-  if (highlightStart !== highlightedListStart || highlightEnd !== highlightedListEnd) {
-    for (let index = highlightedListStart; index < highlightedListEnd; index++) {
-      if (index < highlightStart || index >= highlightEnd) markerEntries[index]?.listItem.classList.remove('is-highlighted');
-    }
-    for (let index = highlightStart; index < highlightEnd; index++) {
-      if (index < highlightedListStart || index >= highlightedListEnd) markerEntries[index].listItem.classList.add('is-highlighted');
-    }
-    highlightedListStart = highlightStart;
-    highlightedListEnd = highlightEnd;
-  }
+  const targetChanged = visible !== listTargetVisibleCount;
+  highlightedListStart = highlightStart;
+  highlightedListEnd = highlightEnd;
+  if (targetChanged) setListVisibleTarget(visible);
+  else renderVirtualList(true);
 
   const highlighted = Math.max(0, highlightEnd - highlightStart);
   timelineLabel.textContent = `${fmt(selected)} 差分${highlighted}件/累積${visible}件`;
   status.textContent = `${selectedPrefecture ? `${selectedPrefecture}：` : ''}${markerEntries.length}件中 ${visible}件を表示`;
 }
-
 function showOsmMenu(entry, syncList = true) {
   if (activeListItem) activeListItem.classList.remove('is-selected');
+  activeListEntryIndex = entry.entryIndex;
+  if (syncList) scrollListToEntry(entry.entryIndex);
   activeListItem = entry.listItem;
-  activeListItem.classList.add('is-selected');
-  if (syncList) activeListItem.scrollIntoView({behavior: 'smooth', block: 'center'});
+  if (activeListItem) activeListItem.classList.add('is-selected');
 
   const menu = document.createElement('div');
   menu.className = 'osm-menu';
@@ -870,7 +1054,6 @@ function setupTimeline(items) {
   if (!items.length) {
     timeline.hidden = true;
     pendingSharedTime = null;
-    syncViewStateToUrl({includeTime: false});
     return false;
   }
   const times = items.map(item => parseUtcDate(item.date).getTime()).filter(Number.isFinite);
@@ -897,7 +1080,6 @@ function setupTimeline(items) {
   playButton.disabled = false;
   pauseButton.disabled = true;
   updateHighlight();
-  syncViewStateToUrl();
   return restoredSharedTime;
 }
 
@@ -1060,48 +1242,62 @@ function waitForPoiSourceReady() {
 async function show(items) {
   const currentRender = ++renderVersion;
   clearMarkers();
-  list.innerHTML = '';
+  status.hidden = false;
 
   const ordered = [...items].sort((a, b) => parseUtcDate(a.date) - parseUtcDate(b.date));
   if (!ordered.length) {
     setupTimeline([]);
     return;
   }
-  markerEntries = ordered.map(item => {
-    const li = document.createElement('li');
-    const editorLabel = item.editorName
-      ? `${item.editorName}${item.editorUid ? ` (${item.editorUid})` : ''}`
-      : '編集者不明';
-    const editor = item.editorName
-      ? `<a class="editor-link" href="https://www.openstreetmap.org/user/${encodeURIComponent(item.editorName)}" target="_blank" rel="noopener noreferrer">${escapeHtml(editorLabel)}</a>`
-      : editorLabel;
-    li.innerHTML = `<div class="list-title"><img class="list-icon" src="icon/${encodeURIComponent(item.icon)}" alt=""><strong>${escapeHtml(item.name)}</strong></div><span>${escapeHtml(item.categoryName)} · ${escapeHtml(item.type)}=${escapeHtml(item.kind || '—')} · ${fmt(item.date)} · ${editor}</span>`;
-    const listIcon = li.querySelector('.list-icon');
-    listIcon.addEventListener('error', () => {
-      if (!listIcon.src.endsWith('/marker-stroked.png')) listIcon.src = 'icon/marker-stroked.png';
-    });
-    li.classList.add('is-future');
-    li.onclick = () => {
-      map.jumpTo({center: [item.lon, item.lat], zoom: 16});
-      showOsmMenu(markerEntries.find(entry => entry.listItem === li), false);
-    };
-    list.append(li);
-    return {item, time: parseUtcDate(item.date).getTime(), listItem: li};
-  });
 
+  status.textContent = `${ordered.length.toLocaleString('ja-JP')}件の一覧データを準備中…`;
+  await waitForNextPaint();
+  if (currentRender !== renderVersion) return;
+
+  markerEntries = new Array(ordered.length);
+  for (let index = 0; index < ordered.length; index++) {
+    const item = ordered[index];
+    markerEntries[index] = {
+      item,
+      time: parseUtcDate(item.date).getTime(),
+      entryIndex: index,
+      listItem: null,
+    };
+    if ((index + 1) % RENDER_CHUNK_SIZE === 0 && index + 1 < ordered.length) {
+      status.textContent = `${(index + 1).toLocaleString('ja-JP')} / ${ordered.length.toLocaleString('ja-JP')}件の一覧データを準備中…`;
+      await waitForNextPaint();
+      if (currentRender !== renderVersion) return;
+    }
+  }
+  renderVirtualList(true);
+
+  status.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件のアイコンを準備中…`;
+  await waitForNextPaint();
   await loadMapIcons(markerEntries);
   if (currentRender !== renderVersion) return;
   ensurePoiLayers();
-  status.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件の地図表示を準備中…`;
-  poiFeatures = markerEntries.map((entry, entryIndex) => ({
+
+  poiFeatures = new Array(markerEntries.length);
+  for (let entryIndex = 0; entryIndex < markerEntries.length; entryIndex++) {
+    const entry = markerEntries[entryIndex];
+    poiFeatures[entryIndex] = {
       type: 'Feature',
       geometry: {type: 'Point', coordinates: [Number(entry.item.lon), Number(entry.item.lat)]},
       properties: {entryIndex, timestamp: entry.time, icon: entry.item.mapIcon, action: entry.item.action},
-    }));
+    };
+    if ((entryIndex + 1) % RENDER_CHUNK_SIZE === 0 && entryIndex + 1 < markerEntries.length) {
+      status.textContent = `${(entryIndex + 1).toLocaleString('ja-JP')} / ${markerEntries.length.toLocaleString('ja-JP')}件の地図データを準備中…`;
+      await waitForNextPaint();
+      if (currentRender !== renderVersion) return;
+    }
+  }
+
   // Set the initial time filters before filling the source so an unfiltered
   // frame containing every POI can never be painted.
   setupTimeline(ordered);
   status.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件の地図表示を準備中…`;
+  await waitForNextPaint();
+  if (currentRender !== renderVersion) return;
   const sourceReady = waitForPoiSourceReady();
   map.getSource(POI_SOURCE).setData({
     type: 'FeatureCollection',
@@ -1115,17 +1311,19 @@ async function show(items) {
   status.hidden = true;
   downloadButton.disabled = false;
   timeline.hidden = false;
-  syncViewStateToUrl();
   playbackStartTimer = setTimeout(() => {
     playbackStartTimer = null;
     playTimeline();
   }, 500);
 }
-
 async function load() {
+  const currentLoad = ++loadVersion;
+  if (activeLoadController) activeLoadController.abort();
+  const controller = new AbortController();
+  activeLoadController = controller;
+  renderVersion++;
   status.hidden = false;
   status.textContent = '保存済みデータを読み込み中…';
-  list.innerHTML = '';
   poiTypeSelect.disabled = true;
   timeline.hidden = true;
   clearMarkers();
@@ -1134,18 +1332,31 @@ async function load() {
       throw new Error('開始日と終了日を正しく選択してください。');
     }
     const [output] = await Promise.all([
-      loadAllPois(days.value, dateFrom.value, dateTo.value, selectedPrefecture),
+      loadAllPois(days.value, dateFrom.value, dateTo.value, selectedPrefecture, controller.signal),
       loadDefinitions(),
     ]);
-    allPoiItems = output.map(item => decorateItem({...item, osmType: item.type, type: item.type2}));
+    if (controller.signal.aborted || currentLoad !== loadVersion) return;
+
+    allPoiItems = new Array(output.length);
+    for (let index = 0; index < output.length; index++) {
+      const item = output[index];
+      allPoiItems[index] = decorateItem({...item, osmType: item.type, type: item.type2});
+      if ((index + 1) % RENDER_CHUNK_SIZE === 0 && index + 1 < output.length) {
+        status.textContent = `${(index + 1).toLocaleString('ja-JP')} / ${output.length.toLocaleString('ja-JP')}件のデータを整理中…`;
+        await waitForNextPaint();
+        if (controller.signal.aborted || currentLoad !== loadVersion) return;
+      }
+    }
     await applyPrefectureFilter(false);
   } catch (error) {
+    if (error.name === 'AbortError' || currentLoad !== loadVersion) return;
     timeline.hidden = true;
     status.hidden = false;
     status.textContent = `取得できませんでした: ${error.message}`;
+  } finally {
+    if (activeLoadController === controller) activeLoadController = null;
   }
 }
-
 range.addEventListener('input', () => {
   pauseTimeline();
   updateHighlight();
@@ -1163,7 +1374,6 @@ timelineStep.addEventListener('change', () => {
   timeStep = Number(timelineStep.value);
   highlightRadius = timeStep;
   if (!markerEntries.length) {
-    syncViewStateToUrl();
     return;
   }
 
@@ -1179,7 +1389,6 @@ timelineStep.addEventListener('change', () => {
   timeStart.textContent = fmt(minimum);
   timeEnd.textContent = fmt(maximum);
   updateHighlight();
-  syncViewStateToUrl();
 });
 function formatInputDate(date) {
   const year = date.getFullYear();
@@ -1264,7 +1473,7 @@ function showShareFeedback(label, stateClass, statusText, duration = 1800) {
 }
 
 async function copyCurrentViewUrl() {
-  const url = syncViewStateToUrl({updateHistory: false}).toString();
+  const url = buildCurrentViewUrl().toString();
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(url);
@@ -1293,7 +1502,6 @@ function startInitialLoadWhenReady() {
   if (initialLoadStarted || !mainMapReady || !prefectureStateReady) return;
   initialLoadStarted = true;
   updatePrefectureMiniMapSelection();
-  syncViewStateToUrl();
   load();
 }
 
@@ -1312,8 +1520,5 @@ function handleMainMapReady() {
   startInitialLoadWhenReady();
 }
 
-urlStateReady = true;
-map.on('moveend', saveMapViewToUrl);
-saveMapViewToUrl();
 if (map.isStyleLoaded()) handleMainMapReady();
 else map.once('load', handleMainMapReady);

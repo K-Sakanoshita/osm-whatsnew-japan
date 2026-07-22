@@ -29,7 +29,7 @@ try {
         (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)
         && DateTimeImmutable::createFromFormat('!Y-m-d', $value)?->format('Y-m-d') === $value;
 
-    $allowedDays = [1, 7, 14, 30, 183, 365];
+    $allowedDays = [1, 2, 7, 14, 30, 183, 365];
     $days = (int) ($_GET['days'] ?? 14);
     if (!in_array($days, $allowedDays, true)) {
         $days = 14;
@@ -168,7 +168,7 @@ try {
 
     if ($mode === 'pois') {
         $stage = 'pois';
-        $limit = max(1, min(2000, (int) ($_GET['limit'] ?? 1000)));
+        $limit = max(1, min(5000, (int) ($_GET['limit'] ?? 1000)));
         $cursor = trim((string) ($_GET['cursor'] ?? ''));
         $nodeConditions = $conditions;
         $nodeParameters = $parameters;

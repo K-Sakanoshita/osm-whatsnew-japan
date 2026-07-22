@@ -32,7 +32,8 @@ header>div {
 }
 
 header h1 {
-  font-size: 22px;
+  font-size: 24px;
+  line-height: 1.15;
   margin: 0
 }
 
@@ -50,6 +51,14 @@ header h1 {
   line-height: inherit;
   text-align: left;
   cursor: pointer
+}
+
+header .site-info-trigger span {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit
 }
 
 .site-info-trigger svg {
@@ -207,6 +216,46 @@ header nav a {
   white-space: nowrap
 }
 
+header nav .header-image-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #c7d8d1;
+  border-radius: 10px;
+  background: #f4f6f5;
+  box-shadow: 0 2px 7px rgba(24, 54, 44, .14);
+  text-decoration: none;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease
+}
+
+header nav .header-image-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover
+}
+
+header nav .header-image-button:hover {
+  border-color: #6fa391;
+  box-shadow: 0 4px 11px rgba(24, 54, 44, .2);
+  transform: translateY(-1px)
+}
+
+header nav .header-image-button:focus-visible {
+  outline: 3px solid rgba(8, 127, 91, .28);
+  outline-offset: 3px
+}
+
+header nav .header-image-button:active {
+  box-shadow: 0 1px 4px rgba(24, 54, 44, .18);
+  transform: translateY(0)
+}
+
 header form {
   display: flex;
   align-items: center;
@@ -336,7 +385,7 @@ button {
   background: #fff;
   border-left: 1px solid #dbe4df;
   overflow: hidden;
-  padding: 15px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   min-height: 0
@@ -368,7 +417,29 @@ button {
 .map-page #list {
   flex: 1;
   min-height: 0;
-  overflow: auto
+  overflow: auto;
+  overflow-anchor: none
+}
+
+.map-page #list>li[data-entry-index] {
+  height: 72px;
+  box-sizing: border-box;
+  overflow: hidden
+}
+
+.map-page #list>li[data-entry-index]>span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.map-page #list>.virtual-list-spacer {
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+  transition: none
 }
 
 .map-page li {
@@ -395,7 +466,15 @@ button {
 .map-page .list-title {
   display: flex;
   align-items: center;
-  gap: 8px
+  gap: 8px;
+  min-width: 0
+}
+
+.map-page .list-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
 }
 
 .map-page .list-icon {
@@ -479,8 +558,8 @@ button {
 .map-page #prefecture-mini-map {
   height: 172px;
   overflow: hidden;
-  border: 1px solid #9db9ad;
-  border-radius: 6px;
+  border: 0;
+  border-radius: 8px;
   background: #75bde8
 }
 
@@ -1367,7 +1446,7 @@ button {
 
 @media(max-width:700px) {
   header h1 {
-    font-size: 19px
+    font-size: 20px
   }
 
   .ranking-page main {
@@ -1436,7 +1515,7 @@ button {
 
   .map-page header h1,
   .details-page header h1 {
-    font-size: 18px
+    font-size: 20px
   }
 
   .map-page main {
@@ -1522,7 +1601,7 @@ button {
 
   .map-page header h1,
   .details-page header h1 {
-    font-size: 17px;
+    font-size: 18px;
     line-height: 1.2;
     white-space: nowrap
   }
@@ -1543,6 +1622,13 @@ button {
   .map-page header nav a,
   .details-page header nav a {
     font-size: 13px
+  }
+
+  .map-page header nav .header-image-button,
+  .details-page header nav .header-image-button {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px
   }
 
   .map-page header form,
@@ -1575,7 +1661,7 @@ button {
 
   .map-page aside {
     height: 45%;
-    padding: 11px 14px
+    padding: 8px 10px
   }
 
   .map-page aside .note {

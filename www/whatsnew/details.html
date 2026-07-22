@@ -30,11 +30,11 @@
   <header>
     <img class="site-logo" src="image/site.png" width="480" height="480" alt="">
     <div><h1><button class="site-info-trigger" type="button" aria-haspopup="dialog" aria-label="OSM What’s New Japanについて"><span>OSM What’s New Japan</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 10.5v6M12 7.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></h1><small>OpenStreetMapで更新された地物の検索・集計</small></div>
-    <nav><a href="index.html">地図へ戻る</a></nav>
+    <nav aria-label="画面切り替え"><a class="header-image-button" href="index.html" aria-label="地図へ戻る" title="地図へ戻る"><img src="image/map.png" width="1254" height="1254" alt=""></a></nav>
   </header>
   <main>
     <section class="prefecture-map-panel">
-      <div class="map-guide"><div class="map-guide-title"><strong>地図から都道府県を選択</strong><button id="show-nationwide" type="button" disabled>全国へ戻る</button></div><span>更新件数が多いほど薄い緑からオレンジへ変化します。クリックすると集計を更新します。</span><form id="filter" class="map-guide-dates"><label><span>期間</span><select id="days"><option value="7">1週間</option><option value="14" selected>2週間</option><option value="30">1ヵ月</option><option value="183">半年</option><option value="365">1年</option></select></label><label><span>開始</span><input id="from" type="date" required></label><label><span>終了</span><input id="to" type="date" required></label></form></div>
+      <div class="map-guide"><div class="map-guide-title"><strong>地図から都道府県を選択</strong><button id="show-nationwide" type="button" disabled>全国へ戻る</button></div><span>更新件数が多いほど薄い緑からオレンジへ変化します。クリックすると集計を更新します。</span><form id="filter" class="map-guide-dates"><label><span>期間</span><select id="days"><option value="7" selected>1週間</option><option value="14">2週間</option><option value="30">1ヵ月</option><option value="183">半年</option><option value="365">1年</option></select></label><label><span>開始</span><input id="from" type="date" required></label><label><span>終了</span><input id="to" type="date" required></label></form></div>
       <p id="status" class="map-status">データを読み込んでいます…</p>
       <div id="prefecture-map" aria-label="都道府県選択地図"></div>
     </section>

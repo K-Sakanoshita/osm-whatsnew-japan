@@ -35,7 +35,7 @@
       <h1><button class="site-info-trigger" type="button" aria-haspopup="dialog" aria-label="OSM What’s New Japanについて"><span>OSM What’s New Japan</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 10.5v6M12 7.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></h1>
       <small>OpenStreetMapで更新された地物の検索・集計</small>
     </div>
-    <nav><a href="details.html">更新レポート</a></nav>
+    <nav aria-label="画面切り替え"><a class="header-image-button" href="details.html" aria-label="更新レポート" title="更新レポート"><img src="image/report.png" width="1254" height="1254" alt=""></a></nav>
 
   </header>
   <main>
@@ -52,7 +52,8 @@
           <label class="timeline-period-label"><span>期間</span>
             <select id="days">
               <option value="1">1日</option>
-              <option value="7" selected>1週間</option>
+              <option value="2" selected>2日</option>
+              <option value="7">1週間</option>
               <option value="14">2週間</option>
               <option value="30">1ヵ月</option>
               <option value="183">半年</option>
