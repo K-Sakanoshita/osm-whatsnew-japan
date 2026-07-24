@@ -29,7 +29,8 @@
 <body class="details-page">
   <header>
     <img class="site-logo" src="image/site.png" width="480" height="480" alt="">
-    <div><h1><button class="site-info-trigger" type="button" aria-haspopup="dialog" aria-label="OSM What’s New Japanについて"><span>OSM What’s New Japan</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 10.5v6M12 7.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></h1><small>OpenStreetMapで更新された地物の検索・集計</small></div>
+    <div><h1>OSM What’s New Japan</h1><small>OpenStreetMapで更新された地物の検索・集計</small></div>
+    <button id="map-guide-open" class="header-help-button" type="button" aria-haspopup="dialog" aria-label="このサイトの見方" title="このサイトの見方"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.8 9a2.35 2.35 0 0 1 4.55.8c0 1.7-2.35 2-2.35 3.7M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <nav aria-label="画面切り替え"><a class="header-image-button" href="index.html" aria-label="地図へ戻る" title="地図へ戻る"><img src="image/map.png" width="1254" height="1254" alt=""></a></nav>
   </header>
   <main>
@@ -47,14 +48,14 @@
     <div class="grid">
       <section id="prefecture-ranking"><h3>都道府県別（降順）</h3><p class="hint">全国表示時の都道府県別更新ノード数です。</p><div class="chart-wrap"><canvas id="prefecture-chart" aria-label="都道府県別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>都道府県</th><th>件数</th><th>割合</th></tr></thead><tbody id="prefecture-table"></tbody></table></section>
       <section><h3>代表タグ別（降順）</h3><p class="hint">選択期間に追加・変更されたノードの代表タグです。</p><div class="chart-wrap"><canvas id="category-chart" aria-label="代表タグ別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>代表タグ</th><th>件数</th><th>割合</th></tr></thead><tbody id="category-table"></tbody></table></section>
-      <section id="mapper-ranking"><h3>マッパー別（降順）</h3><p class="hint">選択期間にノードを編集したアカウントです。</p><div class="chart-wrap"><canvas id="mapper-chart" aria-label="マッパー別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>マッパー</th><th>件数</th><th>割合</th></tr></thead><tbody id="mapper-table"></tbody></table></section>
+      <section id="mapper-ranking"><h3>マッパー別（降順）</h3><p class="hint">選択期間にノードを編集したアカウントです。グラフ・一覧は更新ノード数の上位100名まで表示します。</p><div class="chart-wrap"><canvas id="mapper-chart" aria-label="マッパー別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>マッパー</th><th>件数</th><th>割合</th></tr></thead><tbody id="mapper-table"></tbody></table></section>
       <section><h3>日別更新数（日付順）</h3><p class="hint">更新日時の日ごとの件数です。</p><div class="chart-wrap chart-wrap-daily"><canvas id="daily-chart" aria-label="日付別の更新ノード数"></canvas></div><table><thead><tr><th>日付</th><th>新規</th><th>更新</th><th>合計</th></tr></thead><tbody id="daily-table"></tbody></table></section>
       <section id="changeset-ranking" hidden><h3>変更セット別（降順）</h3><p class="hint">同じ変更セットで更新されたノードをまとめています。</p><div class="chart-wrap"><canvas id="changeset-chart" aria-label="変更セット別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>変更セット</th><th>マッパー</th><th>件数</th></tr></thead><tbody id="changeset-table"></tbody></table></section>
     </div>
   </main>
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-  <script src="site-info.js"></script>
+  <script src="help.js"></script>
   <script src="details.js"></script>
 </body>
 </html>

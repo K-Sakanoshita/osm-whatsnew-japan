@@ -17,6 +17,131 @@ if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
 }
 
 $config = require __DIR__ . '/bootstrap.php';
+$osmUserAgent = trim((string) ($config['osm_user_agent'] ?? 'OSMWhatNewJapan/2.0'));
+$fullResponseMaxBytes = max(262144, (int) ($config['osm_full_max_bytes'] ?? 2 * 1024 * 1024));
+$httpContext = stream_context_create([
+    'http' => [
+        'method' => 'GET',
+        'header' => "Accept: application/xml\r\nUser-Agent: {$osmUserAgent}\r\n",
+        'timeout' => 30,
+        'ignore_errors' => true,
+    ],
+]);
+
+$fetchXml = static function (
+    string $url,
+    ?int $maxBytes = null,
+    bool $allowMissing = false,
+    ?bool &$tooLarge = null
+) use ($httpContext): ?SimpleXMLElement {
+    $tooLarge = false;
+    $limit = $maxBytes === null ? null : $maxBytes + 1;
+    $source = $limit === null
+        ? file_get_contents($url, false, $httpContext)
+        : file_get_contents($url, false, $httpContext, 0, $limit);
+    $responseHeaders = $http_response_header ?? [];
+    $statusLine = '';
+    foreach ($responseHeaders as $responseHeader) {
+        if (str_starts_with($responseHeader, 'HTTP/')) {
+            $statusLine = $responseHeader;
+        }
+    }
+    if ($allowMissing && preg_match('/\s(?:404|410)\s/', $statusLine)) {
+        return null;
+    }
+    if ($source === false || !preg_match('/\s2\d\d\s/', $statusLine)) {
+        throw new RuntimeException("OSM API request failed: {$statusLine} {$url}");
+    }
+    if ($maxBytes !== null && strlen($source) > $maxBytes) {
+        $tooLarge = true;
+        return null;
+    }
+    try {
+        return new SimpleXMLElement($source);
+    } catch (Exception $exception) {
+        throw new RuntimeException("Invalid XML returned by OSM API: {$url}", 0, $exception);
+    }
+};
+
+$readTags = static function (SimpleXMLElement $element): array {
+    $tags = [];
+    foreach ($element->tag as $tag) {
+        $tags[(string) $tag['k']] = (string) $tag['v'];
+    }
+    return $tags;
+};
+$targetAreaKeys = ['amenity', 'shop', 'tourism', 'leisure'];
+$findTargetAreaCategory = static function (array $tags) use ($targetAreaKeys): ?string {
+    foreach ($targetAreaKeys as $key) {
+        if (array_key_exists($key, $tags)) {
+            return $key;
+        }
+    }
+    return null;
+};
+$nodeLocationsFromXml = static function (SimpleXMLElement $xml): array {
+    $locations = [];
+    foreach ($xml->xpath('//node') ?: [] as $node) {
+        if (isset($node['lat'], $node['lon'])) {
+            $locations[(string) $node['id']] = [(float) $node['lon'], (float) $node['lat']];
+        }
+    }
+    return $locations;
+};
+$waysFromXml = static function (SimpleXMLElement $xml): array {
+    $ways = [];
+    foreach ($xml->xpath('//way') ?: [] as $way) {
+        $ways[(string) $way['id']] = $way;
+    }
+    return $ways;
+};
+$pointFromCoordinates = static function (array $coordinates): ?array {
+    if (!$coordinates) {
+        return null;
+    }
+    $lons = array_column($coordinates, 0);
+    $lats = array_column($coordinates, 1);
+    return [(min($lons) + max($lons)) / 2, (min($lats) + max($lats)) / 2];
+};
+$pointForWay = static function (SimpleXMLElement $way, array $nodeLocations) use ($pointFromCoordinates): ?array {
+    $coordinates = [];
+    foreach ($way->nd as $nodeReference) {
+        $reference = (string) $nodeReference['ref'];
+        if (!isset($nodeLocations[$reference])) {
+            return null;
+        }
+        $coordinates[] = $nodeLocations[$reference];
+    }
+    return $pointFromCoordinates($coordinates);
+};
+$pointForRelation = static function (SimpleXMLElement $relation, array $waysById, array $nodeLocations) use ($pointForWay, $pointFromCoordinates): ?array {
+    $coordinates = [];
+    foreach ($relation->member as $member) {
+        $memberType = (string) $member['type'];
+        $reference = (string) $member['ref'];
+        if ($memberType === 'relation') {
+            return null;
+        }
+        if ($memberType === 'node') {
+            if (!isset($nodeLocations[$reference])) {
+                return null;
+            }
+            $coordinates[] = $nodeLocations[$reference];
+            continue;
+        }
+        if ($memberType !== 'way' || !isset($waysById[$reference])) {
+            return null;
+        }
+        $memberPoint = $pointForWay($waysById[$reference], $nodeLocations);
+        if ($memberPoint === null) {
+            return null;
+        }
+        foreach ($waysById[$reference]->nd as $nodeReference) {
+            $coordinates[] = $nodeLocations[(string) $nodeReference['ref']];
+        }
+    }
+    return $pointFromCoordinates($coordinates);
+};
 $db = $config['db'];
 $pdo = new PDO(
     "mysql:host={$db['host']};dbname={$db['dbname']};charset={$db['charset']}",
@@ -176,7 +301,7 @@ if (!$cursorValue) {
     }
 }
 $upsert = $pdo->prepare('INSERT INTO osm_poi (osm_type,osm_id,name,category,category_value,latitude,longitude,prefecture,tags,osm_timestamp,changeset_id,editor_uid,editor_name,change_action,created_osm_at,creator_uid,creator_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),category=VALUES(category),category_value=VALUES(category_value),latitude=VALUES(latitude),longitude=VALUES(longitude),prefecture=VALUES(prefecture),tags=VALUES(tags),osm_timestamp=VALUES(osm_timestamp),changeset_id=VALUES(changeset_id),editor_uid=VALUES(editor_uid),editor_name=VALUES(editor_name),change_action=VALUES(change_action),created_osm_at=COALESCE(created_osm_at,VALUES(created_osm_at)),creator_uid=COALESCE(creator_uid,VALUES(creator_uid)),creator_name=COALESCE(creator_name,VALUES(creator_name))');
-$deletePoi = $pdo->prepare("DELETE FROM osm_poi WHERE osm_type='node' AND osm_id=?");
+$deletePoi = $pdo->prepare('DELETE FROM osm_poi WHERE osm_type=? AND osm_id=?');
 $saveCursor = $pdo->prepare("INSERT INTO osm_sync_state (state_key,state_value) VALUES ('sync_cursor_at',?) ON DUPLICATE KEY UPDATE state_value=VALUES(state_value)");
 $saveCompleted = $pdo->prepare("INSERT INTO osm_sync_state (state_key,state_value) VALUES ('last_sync_at',?) ON DUPLICATE KEY UPDATE state_value=VALUES(state_value)");
 
@@ -190,7 +315,12 @@ $hardTimeLimit = 230;
 $windows = 0;
 $changesets = 0;
 $saved = 0;
+$savedByType = ['node' => 0, 'way' => 0, 'relation' => 0];
 $removed = 0;
+$fullRequests = 0;
+$excludedLarge = 0;
+$excludedNestedRelations = 0;
+$unresolvedGeometry = 0;
 $bbox = array_map('floatval', explode(',', $config['bbox']));
 [$minLon, $minLat, $maxLon, $maxLat] = $bbox;
 $categoryPriority = [
@@ -200,6 +330,74 @@ $categoryPriority = [
     'natural', 'landuse', 'building', 'power', 'waterway', 'barrier',
     'route', 'entrance', 'name',
 ];
+
+$removePoi = static function (string $type, int $osmId) use ($deletePoi, &$removed): void {
+    $deletePoi->execute([$type, $osmId]);
+    $removed += $deletePoi->rowCount();
+};
+$savePoi = static function (
+    string $type,
+    SimpleXMLElement $element,
+    array $tags,
+    string $category,
+    array $point,
+    SimpleXMLElement $changeset,
+    string $changeAction
+) use ($upsert, $findPrefecture, &$saved, &$savedByType): void {
+    [$lon, $lat] = $point;
+    $timestampSource = (string) $element['timestamp'];
+    if ($timestampSource === '') {
+        $timestampSource = (string) ($changeset['closed_at'] ?? 'now');
+    }
+    $timestamp = (new DateTimeImmutable($timestampSource))->format('Y-m-d H:i:s');
+    $editorUid = isset($element['uid'])
+        ? (int) $element['uid']
+        : (isset($changeset['uid']) ? (int) $changeset['uid'] : null);
+    $editorName = (string) ($element['user'] ?? $changeset['user'] ?? '');
+    $upsert->execute([
+        $type,
+        (int) $element['id'],
+        $tags['name'] ?? $tags['name:ja'] ?? null,
+        $category,
+        mb_substr($tags[$category], 0, 255),
+        $lat,
+        $lon,
+        $findPrefecture($lat, $lon),
+        json_encode($tags, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+        $timestamp,
+        (int) $changeset['id'],
+        $editorUid,
+        $editorName !== '' ? $editorName : null,
+        $changeAction,
+        $changeAction === 'create' ? $timestamp : null,
+        $changeAction === 'create' ? $editorUid : null,
+        $changeAction === 'create' && $editorName !== '' ? $editorName : null,
+    ]);
+    $saved++;
+    $savedByType[$type]++;
+};
+$isInsideTarget = static function (array $point) use (
+    $minLon,
+    $minLat,
+    $maxLon,
+    $maxLat,
+    $isExcludedForeignArea
+): bool {
+    [$lon, $lat] = $point;
+    return $lon >= $minLon
+        && $lon <= $maxLon
+        && $lat >= $minLat
+        && $lat <= $maxLat
+        && !$isExcludedForeignArea($lat, $lon);
+};
+$findElementById = static function (SimpleXMLElement $xml, string $type, int $osmId): ?SimpleXMLElement {
+    foreach ($xml->{$type} as $element) {
+        if ((int) $element['id'] === $osmId) {
+            return $element;
+        }
+    }
+    return null;
+};
 
 while (
     $cursor < $target
@@ -215,35 +413,39 @@ while (
         'closed' => 'true',
         'limit' => 100,
     ]);
-    $xml = new SimpleXMLElement(file_get_contents($url));
+    $xml = $fetchXml($url);
+    if ($xml === null) {
+        throw new RuntimeException('Unexpected empty changeset response.');
+    }
 
     foreach ($xml->changeset as $changeset) {
-        $id = (int) $changeset['id'];
-        $diff = new SimpleXMLElement(file_get_contents("{$config['osm_api']}/changeset/$id/download"));
-        $createdNodes = [];
-        foreach ($diff->xpath('//create/node') as $createdNode) {
-            $createdNodes[(string) $createdNode['id']] = true;
+        $changesetId = (int) $changeset['id'];
+        $diff = $fetchXml("{$config['osm_api']}/changeset/{$changesetId}/download");
+        if ($diff === null) {
+            throw new RuntimeException("Unexpected empty changeset download: {$changesetId}");
         }
-        foreach ($diff->xpath('//node') as $node) {
-            $tags = [];
-            foreach ($node->tag as $tag) {
-                $tags[(string) $tag['k']] = (string) $tag['v'];
+        $diffNodeLocations = $nodeLocationsFromXml($diff);
+        $diffWays = $waysFromXml($diff);
+
+        $createdObjects = ['node' => [], 'way' => [], 'relation' => []];
+        foreach (array_keys($createdObjects) as $type) {
+            foreach ($diff->xpath("//create/{$type}") ?: [] as $createdObject) {
+                $createdObjects[$type][(string) $createdObject['id']] = true;
             }
-            // Keep every tagged node. If all tags were removed, also remove a
-            // previously stored copy so the database continues to represent
-            // the current tagged objects only.
-            if (!$tags) {
-                $deletePoi->execute([(int) $node['id']]);
-                $removed += $deletePoi->rowCount();
-                continue;
+            foreach ($diff->xpath("//delete/{$type}") ?: [] as $deletedObject) {
+                $removePoi($type, (int) $deletedObject['id']);
             }
-            if (!isset($node['lat'], $node['lon'])) {
+        }
+
+        foreach ($diff->xpath('//create/node | //modify/node') ?: [] as $node) {
+            $tags = $readTags($node);
+            $nodeId = (int) $node['id'];
+            if (!$tags || !isset($node['lat'], $node['lon'])) {
+                $removePoi('node', $nodeId);
                 continue;
             }
 
-            // Prefer keys that describe a POI when several tags exist. This
-            // only selects the category shown in the UI; every tag remains in
-            // the JSON stored below and no tag key is used as an import filter.
+            // Nodes retain the original behavior: every tagged node is saved.
             $category = null;
             foreach ($categoryPriority as $candidate) {
                 if (array_key_exists($candidate, $tags)) {
@@ -252,30 +454,131 @@ while (
                 }
             }
             $category ??= (string) array_key_first($tags);
-            $lat = (float) $node['lat'];
-            $lon = (float) $node['lon'];
-            if ($lon < $minLon || $lon > $maxLon || $lat < $minLat || $lat > $maxLat) {
+            $point = [(float) $node['lon'], (float) $node['lat']];
+            if (!$isInsideTarget($point)) {
+                $removePoi('node', $nodeId);
                 continue;
             }
-            if ($isExcludedForeignArea($lat, $lon)) {
-                continue;
-            }
-            $timestamp = (new DateTimeImmutable((string) $node['timestamp']))->format('Y-m-d H:i:s');
-            $editorUid = isset($node['uid']) ? (int) $node['uid'] : (isset($changeset['uid']) ? (int) $changeset['uid'] : null);
-            $editorName = (string) ($node['user'] ?? $changeset['user'] ?? '');
-            $changeAction = isset($createdNodes[(string) $node['id']]) ? 'create' : 'modify';
-            $upsert->execute([
-                'node', (int) $node['id'], $tags['name'] ?? $tags['name:ja'] ?? null,
-                $category, mb_substr($tags[$category], 0, 255), $lat, $lon, $findPrefecture($lat, $lon),
-                json_encode($tags, JSON_UNESCAPED_UNICODE), $timestamp, $id,
-                $editorUid, $editorName !== '' ? $editorName : null,
-                $changeAction,
-                $changeAction === 'create' ? $timestamp : null,
-                $changeAction === 'create' ? $editorUid : null,
-                $changeAction === 'create' && $editorName !== '' ? $editorName : null,
-            ]);
-            $saved++;
+            $action = isset($createdObjects['node'][(string) $nodeId]) ? 'create' : 'modify';
+            $savePoi('node', $node, $tags, $category, $point, $changeset, $action);
         }
+
+        foreach ($diff->xpath('//create/way | //modify/way') ?: [] as $way) {
+            $wayId = (int) $way['id'];
+            $tags = $readTags($way);
+            $category = $findTargetAreaCategory($tags);
+            if ($category === null) {
+                $removePoi('way', $wayId);
+                continue;
+            }
+
+            $point = $pointForWay($way, $diffNodeLocations);
+            if ($point === null) {
+                $fullRequests++;
+                $tooLarge = false;
+                $full = $fetchXml(
+                    "{$config['osm_api']}/way/{$wayId}/full",
+                    $fullResponseMaxBytes,
+                    true,
+                    $tooLarge
+                );
+                usleep(100000);
+                if ($full === null) {
+                    $removePoi('way', $wayId);
+                    if ($tooLarge) {
+                        $excludedLarge++;
+                    } else {
+                        $unresolvedGeometry++;
+                    }
+                    continue;
+                }
+                $fullWay = $findElementById($full, 'way', $wayId);
+                $point = $fullWay === null ? null : $pointForWay($fullWay, $nodeLocationsFromXml($full));
+            }
+            if ($point === null) {
+                $removePoi('way', $wayId);
+                $unresolvedGeometry++;
+                continue;
+            }
+            if (!$isInsideTarget($point)) {
+                $removePoi('way', $wayId);
+                continue;
+            }
+
+            $action = isset($createdObjects['way'][(string) $wayId]) ? 'create' : 'modify';
+            $savePoi('way', $way, $tags, $category, $point, $changeset, $action);
+        }
+
+        foreach ($diff->xpath('//create/relation | //modify/relation') ?: [] as $relation) {
+            $relationId = (int) $relation['id'];
+            $tags = $readTags($relation);
+            $category = $findTargetAreaCategory($tags);
+            if ($category === null || ($tags['type'] ?? '') !== 'multipolygon') {
+                $removePoi('relation', $relationId);
+                continue;
+            }
+
+            $hasRelationMember = false;
+            foreach ($relation->member as $member) {
+                if ((string) $member['type'] === 'relation') {
+                    $hasRelationMember = true;
+                    break;
+                }
+            }
+            if ($hasRelationMember) {
+                $removePoi('relation', $relationId);
+                $excludedNestedRelations++;
+                continue;
+            }
+
+            $point = $pointForRelation($relation, $diffWays, $diffNodeLocations);
+            if ($point === null) {
+                $fullRequests++;
+                $tooLarge = false;
+                $full = $fetchXml(
+                    "{$config['osm_api']}/relation/{$relationId}/full",
+                    $fullResponseMaxBytes,
+                    true,
+                    $tooLarge
+                );
+                usleep(100000);
+                if ($full === null) {
+                    $removePoi('relation', $relationId);
+                    if ($tooLarge) {
+                        $excludedLarge++;
+                    } else {
+                        $unresolvedGeometry++;
+                    }
+                    continue;
+                }
+                $fullRelation = $findElementById($full, 'relation', $relationId);
+                if ($fullRelation !== null) {
+                    foreach ($fullRelation->member as $member) {
+                        if ((string) $member['type'] === 'relation') {
+                            $removePoi('relation', $relationId);
+                            $excludedNestedRelations++;
+                            continue 2;
+                        }
+                    }
+                }
+                $point = $fullRelation === null
+                    ? null
+                    : $pointForRelation($fullRelation, $waysFromXml($full), $nodeLocationsFromXml($full));
+            }
+            if ($point === null) {
+                $removePoi('relation', $relationId);
+                $unresolvedGeometry++;
+                continue;
+            }
+            if (!$isInsideTarget($point)) {
+                $removePoi('relation', $relationId);
+                continue;
+            }
+
+            $action = isset($createdObjects['relation'][(string) $relationId]) ? 'create' : 'modify';
+            $savePoi('relation', $relation, $tags, $category, $point, $changeset, $action);
+        }
+
         $changesets++;
         usleep(100000);
     }
@@ -289,6 +592,10 @@ $status = $cursor >= $target ? 'complete' : 'partial';
 if ($status === 'complete') {
     $saveCompleted->execute([gmdate('c', $cursor)]);
 }
-echo "sync $status: windows=$windows changesets=$changesets saved=$saved removed=$removed foreign_removed=$foreignRemoved cursor=" . gmdate('c', $cursor) . "\n";
+echo "sync {$status}: windows={$windows} changesets={$changesets}"
+    . " saved={$saved} nodes={$savedByType['node']} ways={$savedByType['way']} relations={$savedByType['relation']}"
+    . " removed={$removed} full_requests={$fullRequests} excluded_large={$excludedLarge}"
+    . " excluded_nested_relations={$excludedNestedRelations} unresolved_geometry={$unresolvedGeometry}"
+    . " foreign_removed={$foreignRemoved} cursor=" . gmdate('c', $cursor) . "\n";
 flock($lockHandle, LOCK_UN);
 fclose($lockHandle);

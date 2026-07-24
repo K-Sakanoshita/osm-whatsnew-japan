@@ -302,6 +302,16 @@ try {
     $changesetCountStatement->execute($parameters);
     $changesetCount = (int) $changesetCountStatement->fetchColumn();
 
+    $stage = 'japan mapper count';
+    $mapperCountStatement = $pdo->prepare(
+        "SELECT COUNT(DISTINCT CASE"
+        . " WHEN editor_uid IS NOT NULL THEN CONCAT('uid:', editor_uid)"
+        . " ELSE CONCAT('name:', COALESCE(NULLIF(editor_name,''),'不明'))"
+        . " END) FROM osm_poi WHERE {$where}"
+    );
+    $mapperCountStatement->execute($parameters);
+    $mapperCount = (int) $mapperCountStatement->fetchColumn();
+
     $stage = 'japan mappers';
     $mappers = $fetchAll(
         $pdo,
@@ -361,6 +371,7 @@ try {
             'meta' => $meta,
             'total' => $total,
             'changesetCount' => $changesetCount,
+            'mapperCount' => $mapperCount,
             'mappers' => $castCounts($mappers),
             'changesets' => $castCounts($changesets),
             'categories' => $castCounts($categories),

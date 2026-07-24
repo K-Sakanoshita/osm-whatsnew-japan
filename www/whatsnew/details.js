@@ -22,6 +22,17 @@ const prefectureName = feature => String(feature?.properties?.['name:ja'] || fea
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const number = value => Number(value).toLocaleString('ja-JP');
 const percent = (value, total) => total ? `${(value / total * 100).toFixed(1)}%` : '0.0%';
+function updateTotalSummary(total, creates, modifies) {
+  const element = document.querySelector('#total');
+  const main = document.createElement('span');
+  main.className = 'summary-total-main';
+  main.textContent = `${number(total)}件`;
+  const detail = document.createElement('span');
+  detail.className = 'summary-total-detail';
+  detail.textContent = `（新規${number(creates)}件/更新${number(modifies)}件）`;
+  element.replaceChildren(main, document.createTextNode(' '), detail);
+}
+
 const formatJstDateTime = value => {
   const date = new Date(`${String(value).replace(' ', 'T')}Z`);
   const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', {
@@ -264,7 +275,7 @@ function render(rows) {
   const creates = rows.filter(row => row.action === 'create').length;
   const mapperRows = countBy(rows, row => row.editorUid || row.editorName || 'unknown');
   const changesets = countBy(rows.filter(row => row.changeset), row => row.changeset);
-  document.querySelector('#total').textContent = `${number(total)}件（新規${number(creates)}件/更新${number(total - creates)}件）`;
+  updateTotalSummary(total, creates, total - creates);
   document.querySelector('#mappers').textContent = `${number(mapperRows.length)}人`;
   document.querySelector('#changesets').textContent = `${number(changesets.length)}件`;
 
@@ -321,10 +332,10 @@ function renderNationwide(data) {
   const dailyRows = buildAggregateDailyRows(data.daily || []);
   const creates = dailyRows.reduce((sum, row) => sum + row.create, 0);
   const modifies = dailyRows.reduce((sum, row) => sum + row.modify, 0);
-  const mapperCount = (data.mappers || []).length;
+  const mapperCount = Number(data.mapperCount) || 0;
   const changesets = (data.changesets || []).map(row => ({key: row.changeset, count: Number(row.count) || 0, row: {editorName: row.editorName}}));
-  document.querySelector('#total').textContent = `${number(total)}件（新規${number(creates)}件/更新${number(modifies)}件）`;
-  document.querySelector('#mappers').textContent = mapperCount >= 100 ? '100人以上' : `${number(mapperCount)}人`;
+  updateTotalSummary(total, creates, modifies);
+  document.querySelector('#mappers').textContent = `${number(mapperCount)}人`;
   document.querySelector('#changesets').textContent = `${number(Number(data.changesetCount) || 0)}件`;
 
   const prefectures = (data.prefectures || []).map(row => ({key: row.name, count: Number(row.count) || 0, row}));

@@ -69,6 +69,8 @@ const dateTo = document.querySelector('#date-to');
 const prefectureFilterReset = document.querySelector('#prefecture-filter-reset');
 const shareButton = document.querySelector('#share-view');
 const downloadButton = document.querySelector('#download-data');
+const guide = window.osmWhatsNewGuide;
+const guideDialog = guide?.dialog;
 
 const shareStatus = document.querySelector('#share-status');
 if (requestedStepValue) timelineStep.value = requestedStepValue;
@@ -135,6 +137,8 @@ let mainMapReady = false;
 let prefectureStateReady = false;
 let initialLoadStarted = false;
 let shareFeedbackTimer = null;
+let resumePlaybackAfterGuide = false;
+let automaticPlaybackPending = false;
 const PREFECTURE_MINI_SOURCE = 'mini-prefectures';
 const PREFECTURE_MINI_FILL_LAYER = 'mini-prefectures-fill';
 const PREFECTURE_MINI_SELECTED_LAYER = 'mini-prefectures-selected';
@@ -709,6 +713,7 @@ function playNextStep() {
 }
 
 function playTimeline() {
+  if (guideDialog?.open) return;
   pauseTimeline();
   if (Number(range.value) >= Number(range.max)) range.value = range.min;
   isPlaying = true;
@@ -718,6 +723,45 @@ function playTimeline() {
   playNextStep();
 }
 
+
+function startPendingAutomaticPlayback() {
+  if (!automaticPlaybackPending || guideDialog?.open || timeline.hidden || !markerEntries.length) return;
+  automaticPlaybackPending = false;
+  if (playbackStartTimer !== null) return;
+  playbackStartTimer = setTimeout(() => {
+    playbackStartTimer = null;
+    if (guideDialog?.open) {
+      automaticPlaybackPending = true;
+      return;
+    }
+    playTimeline();
+  }, 500);
+}
+
+function requestAutomaticPlayback() {
+  automaticPlaybackPending = true;
+  startPendingAutomaticPlayback();
+}
+
+function handleGuideBeforeOpen(event) {
+  const mode = event.detail?.mode || 'manual';
+  resumePlaybackAfterGuide = mode === 'manual' && isPlaying;
+  if (mode === 'manual') automaticPlaybackPending = false;
+  pauseTimeline();
+}
+
+function handleGuideClosed(event) {
+  const mode = event.detail?.mode || '';
+  const shouldResume = mode === 'manual' && resumePlaybackAfterGuide;
+  resumePlaybackAfterGuide = false;
+
+  if (mode === 'automatic') {
+    startPendingAutomaticPlayback();
+  } else if (mode === 'manual') {
+    automaticPlaybackPending = false;
+    if (shouldResume && !timeline.hidden && markerEntries.length) playTimeline();
+  }
+}
 function lowerBound(value) {
   let low = 0;
   let high = markerEntries.length;
@@ -1245,6 +1289,7 @@ async function show(items) {
   status.hidden = false;
 
   const ordered = [...items].sort((a, b) => parseUtcDate(a.date) - parseUtcDate(b.date));
+  automaticPlaybackPending = false;
   if (!ordered.length) {
     setupTimeline([]);
     return;
@@ -1311,10 +1356,7 @@ async function show(items) {
   status.hidden = true;
   downloadButton.disabled = false;
   timeline.hidden = false;
-  playbackStartTimer = setTimeout(() => {
-    playbackStartTimer = null;
-    playTimeline();
-  }, 500);
+  requestAutomaticPlayback();
 }
 async function load() {
   const currentLoad = ++loadVersion;
@@ -1497,6 +1539,8 @@ async function copyCurrentViewUrl() {
 }
 downloadButton.addEventListener('click', downloadCurrentData);
 shareButton?.addEventListener('click', copyCurrentViewUrl);
+guideDialog?.addEventListener('osm-guide-before-open', handleGuideBeforeOpen);
+guideDialog?.addEventListener('osm-guide-closed', handleGuideClosed);
 
 function startInitialLoadWhenReady() {
   if (initialLoadStarted || !mainMapReady || !prefectureStateReady) return;
@@ -1504,6 +1548,8 @@ function startInitialLoadWhenReady() {
   updatePrefectureMiniMapSelection();
   load();
 }
+
+if (guide && !guide.hasSeen()) guide.open({mode: 'automatic', focusTarget: map.getCanvas()});
 
 initializePrefectureMiniMap().catch(error => {
   status.textContent = `都道府県地図を読み込めませんでした: ${error.message}`;
