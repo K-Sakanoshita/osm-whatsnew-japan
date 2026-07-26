@@ -57,6 +57,12 @@ const timeline = document.querySelector('#timeline');
 const range = document.querySelector('#time-range');
 const timelineLabel = document.querySelector('#timeline-label');
 const timelinePrefecture = document.querySelector('#timeline-prefecture');
+const timelineSummaryPrefecture = document.querySelector('#timeline-summary-prefecture');
+const timelineSummaryPeriod = document.querySelector('#timeline-summary-period');
+const timelineSummaryCount = document.querySelector('#timeline-summary-count');
+const timelineDetails = document.querySelector('#timeline-details');
+const timelineToggle = document.querySelector('#timeline-toggle');
+const summaryPlayButton = document.querySelector('#summary-play-timeline');
 const timeStart = document.querySelector('#time-start');
 const timeEnd = document.querySelector('#time-end');
 const playButton = document.querySelector('#play-timeline');
@@ -148,6 +154,16 @@ const PREFECTURE_MAIN_LINE_LAYER = 'selected-prefecture-boundary-line';
 const PREFECTURE_NAME_EXPRESSION = ['coalesce', ['get', 'name:ja'], ['get', 'name']];
 const prefectureName = feature => String(feature?.properties?.['name:ja'] || feature?.properties?.name || '');
 const prefectureCode = feature => String(feature?.properties?.['ISO3166-2'] || '').toUpperCase();
+
+function updateTimelineSummary() {
+  const shortDate = value => {
+    const [, month, day] = String(value || '').split('-');
+    return month && day ? `${Number(month)}/${Number(day)}` : '—';
+  };
+  timelineSummaryPrefecture.textContent = selectedPrefecture || '全国';
+  timelineSummaryPeriod.textContent = `${shortDate(dateFrom.value)}〜${shortDate(dateTo.value)}`;
+  timelineSummaryCount.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件`;
+}
 
 const parseUtcDate = value => {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(value)) {
@@ -364,6 +380,7 @@ function updatePrefectureMiniMapSelection() {
   prefectureFilterReset.disabled = !selectedPrefecture;
   prefectureFilterReset.hidden = !selectedPrefecture;
   timelinePrefecture.textContent = selectedPrefecture || '全国';
+  updateTimelineSummary();
   timelinePrefecture.hidden = false;
   timeline.classList.add('has-prefecture');
   if (prefectureMiniMap?.getLayer(PREFECTURE_MINI_SELECTED_LAYER)) {
@@ -627,6 +644,7 @@ function clearMarkers() {
   }
   markerEntries = [];
   poiFeatures = [];
+  updateTimelineSummary();
   downloadButton.disabled = true;
   visibleListCount = 0;
   clusterVisibleCount = -1;
@@ -656,6 +674,8 @@ function pauseTimeline() {
   }
   playButton.disabled = false;
   pauseButton.disabled = true;
+  summaryPlayButton.textContent = '再生';
+  summaryPlayButton.setAttribute('aria-label', 'タイムラインを再生');
 }
 
 function animateRange(from, to, duration, done) {
@@ -719,6 +739,8 @@ function playTimeline() {
   isPlaying = true;
   playButton.disabled = true;
   pauseButton.disabled = false;
+  summaryPlayButton.textContent = '停止';
+  summaryPlayButton.setAttribute('aria-label', 'タイムラインを停止');
   updateHighlight();
   playNextStep();
 }
@@ -1314,6 +1336,7 @@ async function show(items) {
       if (currentRender !== renderVersion) return;
     }
   }
+  updateTimelineSummary();
   renderVirtualList(true);
 
   status.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件のアイコンを準備中…`;
@@ -1411,6 +1434,16 @@ range.addEventListener('change', () => {
 });
 playButton.addEventListener('click', playTimeline);
 pauseButton.addEventListener('click', pauseTimeline);
+summaryPlayButton.addEventListener('click', () => {
+  if (isPlaying) pauseTimeline();
+  else playTimeline();
+});
+timelineToggle.addEventListener('click', () => {
+  const expanded = timelineToggle.getAttribute('aria-expanded') !== 'true';
+  timelineToggle.setAttribute('aria-expanded', String(expanded));
+  timelineToggle.textContent = expanded ? '閉じる' : '条件変更';
+  timelineDetails.hidden = !expanded;
+});
 timelineStep.addEventListener('change', () => {
   pauseTimeline();
   timeStep = Number(timelineStep.value);

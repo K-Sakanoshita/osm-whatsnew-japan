@@ -583,10 +583,59 @@ button {
   display: none
 }
 
+.map-page .timeline-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  color: #40564e;
+  white-space: nowrap
+}
+
+.map-page .timeline-summary>strong {
+  overflow: hidden;
+  color: #174d3e;
+  text-overflow: ellipsis
+}
+
+.map-page #timeline-summary-count {
+  font-variant-numeric: tabular-nums
+}
+
+.map-page .timeline-summary-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto
+}
+
+.map-page .timeline-summary-actions button {
+  min-width: 58px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.2
+}
+
+.map-page #timeline-toggle {
+  border-color: #8daaa0;
+  background: #fff;
+  color: #0b654f
+}
+
+.map-page .timeline-details {
+  position: relative;
+  margin-top: 9px;
+  padding-top: 1px;
+  border-top: 1px solid #dbe7e2
+}
+
+.map-page .timeline-details[hidden] {
+  display: none
+}
+
 .map-page .timeline-prefecture-control {
   position: absolute;
-  top: 8px;
-  left: 14px;
+  top: 7px;
+  left: 0;
   display: flex;
   align-items: center
 }
@@ -1688,6 +1737,21 @@ button {
     width: calc(100% - 16px);
     padding: 8px 11px 9px;
     border-radius: 11px
+  }
+
+  .map-page .timeline-summary {
+    gap: 7px;
+    font-size: 12px
+  }
+
+  .map-page .timeline-summary-actions {
+    gap: 4px
+  }
+
+  .map-page .timeline-summary-actions button {
+    min-width: 50px;
+    padding: 6px 7px;
+    font-size: 11px
   }
 
   .map-page .timeline-prefecture-control {
