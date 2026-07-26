@@ -90,6 +90,25 @@ php -S localhost:8000 -t www/whatsnew
 
 ブラウザーで `http://localhost:8000/` を開きます。
 
+既存のMySQLデータベースを使うローカルテスト環境は、Linux上で次のスクリプトから起動できます。MySQLへ接続できない場合はMySQLサービスを起動し、続けてPHP内蔵WebサーバーとphpMyAdminを起動します。データベースの作成やスキーマ投入は行いません。
+
+```shell
+./scripts/test-env.sh start
+```
+
+DB接続設定は、`private-osm-test-config.php`があれば優先して使用し、なければ`private-osm-config.php`を使用します。別の設定を使う場合は`OSM_APP_CONFIG`へ絶対パスを指定します。Webアプリの既定URLは `http://127.0.0.1:8000/`、phpMyAdminは `http://127.0.0.1:8081/` です。
+
+```shell
+WEB_PORT=8080 ./scripts/test-env.sh restart
+OSM_APP_CONFIG=/absolute/path/to/config.php ./scripts/test-env.sh start
+./scripts/test-env.sh status
+./scripts/test-env.sh stop
+```
+
+`stop`はWebアプリとphpMyAdminを停止します。他のアプリケーションへの影響を避けるため、MySQLサービスは停止しません。PIDとログは`/tmp/osm-whatnew-japan-ユーザーID/`へ生成されます。保存先は`TEST_RUNTIME_DIR`で変更できます。
+
+既存DBのパスワードが空の場合、スクリプトから起動したローカルphpMyAdminに限って空パスワードでのログインを許可します。この場合、phpMyAdminを`127.0.0.1`または`localhost`以外では起動できません。システムのphpMyAdmin設定とMySQLユーザーは変更しません。
+
 ### 4. OSM同期
 
 `sync.php` はWebアクセスを拒否し、CLIからのみ実行できます。
@@ -217,7 +236,7 @@ api.php?mode=japan&days=30&prefecture=岐阜県
 
 - `total`：対象地物総数
 - `mapperCount`：対象期間のマッパー総数（UID単位、UIDがない場合は表示名単位）
-- `mappers`：マッパー別上位100件
+- `mappers`：マッパー別の新規・更新・合計件数（合計の上位100件）
 - `changesetCount`：変更セット総数
 - `changesets`：変更セット別上位100件
 - `categories`：代表タグ別上位100件
@@ -253,7 +272,7 @@ api.php?mode=facets&days=30&prefecture=愛知県
 
 対象期間と共通フィルター内の候補を返します。
 
-- `mappers`：UID、表示名、件数（上位100件）
+- `mappers`：UID、表示名、新規・更新・合計件数（合計の上位100件）
 - `categories`：`category`、`category_value`、件数（上位500件）
 
 ### エラー
@@ -281,7 +300,7 @@ api.php?mode=facets&days=30&prefecture=愛知県
 - 初回アクセス時に利用ガイドを表示し、閉じるまではタイムスケールの自動再生を待機するようにしました。表示済み状態は `localStorage` の `osm-whatsnew-guide-v1` で保持します。
 - 地図画面と更新レポート画面のヘッダーへ共通のヘルプボタンを追加し、サイト概要、API・ソースコード、ライセンス案内を利用ガイドへ統合しました。
 - ガイドの共通処理を `help.js` へ分離し、PCでは中央モーダル、モバイルではボトムシートとして同じ `dialog` 要素を表示する構成にしました。
-- 更新レポートの更新ノード数は、新規・更新の内訳を括弧単位で折り返すようにしました。
+- 更新レポートの更新地物数は、新規・更新の内訳を括弧単位で折り返すようにしました。
 - 全国集計APIへ正確なマッパー総数 `mapperCount` を追加しました。ランキングは上位100名までのまま、概要カードには総人数を表示します。
 - `sync.php` でタグ付きノードに加え、対象タグを持つwayとmultipolygon relationを収集できるようにしました。代表座標の算出、完全データ取得サイズの上限、入れ子relationと未解決ジオメトリの除外、地物種別別の同期件数出力に対応しました。
 

@@ -203,6 +203,18 @@ function countBy(rows, keyBuilder) {
   return [...counts.values()].sort((a, b) => b.count - a.count || String(a.key).localeCompare(String(b.key), 'ja'));
 }
 
+function countMappers(rows) {
+  const counts = new Map();
+  rows.forEach(row => {
+    const key = row.editorUid || row.editorName || 'unknown';
+    const current = counts.get(key) || {key, count: 0, creates: 0, modifies: 0, row};
+    current.count++;
+    current[row.action === 'create' ? 'creates' : 'modifies']++;
+    counts.set(key, current);
+  });
+  return [...counts.values()].sort((a, b) => b.count - a.count || String(a.key).localeCompare(String(b.key), 'ja'));
+}
+
 function categoryName(row) {
   return categoryRules[row.type]?.[row.value] || row.value || '不明';
 }
@@ -223,6 +235,31 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel) {
       animation: false,
       plugins: {legend: {display: false}},
       scales: {x: {beginAtZero: true, ticks: {precision: 0}}},
+    },
+  });
+}
+
+function renderMapperChart(entries) {
+  charts['mapper-chart']?.destroy();
+  const top = entries.slice(0, 10);
+  charts['mapper-chart'] = new Chart(document.querySelector('#mapper-chart'), {
+    type: 'bar',
+    data: {
+      labels: top.map(entry => entry.row.editorName || '不明'),
+      datasets: [
+        {label: '新規', data: top.map(entry => entry.creates), backgroundColor: CREATE_COLOR},
+        {label: '更新', data: top.map(entry => entry.modifies), backgroundColor: MODIFY_COLOR},
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        x: {stacked: true, beginAtZero: true, ticks: {precision: 0}},
+        y: {stacked: true},
+      },
     },
   });
 }
@@ -273,14 +310,14 @@ function render(rows) {
   currentReportRows = rows;
   const total = rows.length;
   const creates = rows.filter(row => row.action === 'create').length;
-  const mapperRows = countBy(rows, row => row.editorUid || row.editorName || 'unknown');
+  const mapperRows = countMappers(rows);
   const changesets = countBy(rows.filter(row => row.changeset), row => row.changeset);
   updateTotalSummary(total, creates, total - creates);
   document.querySelector('#mappers').textContent = `${number(mapperRows.length)}人`;
   document.querySelector('#changesets').textContent = `${number(changesets.length)}件`;
 
   const categories = countBy(rows, row => `${row.type}=${row.value}`);
-  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新ノード数');
+  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数');
   document.querySelector('#category-table').innerHTML = categories.slice(0, 100).map((entry, index) =>
     `<tr><td>${index + 1}</td><td>${escapeHtml(categoryName(entry.row))}<br><small>${escapeHtml(entry.key)}</small></td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
 
@@ -288,9 +325,9 @@ function render(rows) {
     const name = entry.row.editorName || '不明';
     const label = entry.row.editorUid ? `${name} (${entry.row.editorUid})` : name;
     const linked = name === '不明' ? escapeHtml(label) : `<a href="https://www.openstreetmap.org/user/${encodeURIComponent(name)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
-    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
+    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.creates)}</td><td>${number(entry.modifies)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
   }).join('');
-  renderHorizontalChart('mapper-chart', mapperRows, entry => entry.row.editorName || '不明', '更新ノード数');
+  renderMapperChart(mapperRows);
 
   const dailyRows = buildDailyRows(rows);
   renderDailyChart(dailyRows);
@@ -298,7 +335,7 @@ function render(rows) {
     `<tr><td>${escapeHtml(row.date.replace(/-/g, '/'))}</td><td>${number(row.create)}</td><td>${number(row.modify)}</td><td>${number(row.create + row.modify)}</td></tr>`).join('');
 
 
-  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新ノード数');
+  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数');
   document.querySelector('#changeset-table').innerHTML = changesets.slice(0, 100).map((entry, index) => {
     const editor = entry.row.editorName || '不明';
     return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
@@ -339,25 +376,31 @@ function renderNationwide(data) {
   document.querySelector('#changesets').textContent = `${number(Number(data.changesetCount) || 0)}件`;
 
   const prefectures = (data.prefectures || []).map(row => ({key: row.name, count: Number(row.count) || 0, row}));
-  renderHorizontalChart('prefecture-chart', prefectures, entry => entry.row.name, '更新ノード数');
+  renderHorizontalChart('prefecture-chart', prefectures, entry => entry.row.name, '更新地物数');
   document.querySelector('#prefecture-table').innerHTML = prefectures.map((entry, index) =>
     `<tr><td>${index + 1}</td><td>${escapeHtml(entry.row.name)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
 
   const categories = (data.categories || []).map(row => ({key: `${row.type}=${row.value}`, count: Number(row.count) || 0, row}));
-  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新ノード数');
+  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数');
   document.querySelector('#category-table').innerHTML = categories.map((entry, index) =>
     `<tr><td>${index + 1}</td><td>${escapeHtml(categoryName(entry.row))}<br><small>${escapeHtml(entry.key)}</small></td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
 
-  const mappers = (data.mappers || []).map(row => ({key: row.uid || row.name, count: Number(row.count) || 0, row: {editorName: row.name, editorUid: row.uid}}));
-  renderHorizontalChart('mapper-chart', mappers, entry => entry.row.editorName || '不明', '更新ノード数');
+  const mappers = (data.mappers || []).map(row => ({
+    key: row.uid || row.name,
+    count: Number(row.count) || 0,
+    creates: Number(row.creates) || 0,
+    modifies: Number(row.modifies) || 0,
+    row: {editorName: row.name, editorUid: row.uid},
+  }));
+  renderMapperChart(mappers);
   document.querySelector('#mapper-table').innerHTML = mappers.map((entry, index) => {
     const name = entry.row.editorName || '不明';
     const label = entry.row.editorUid ? `${name} (${entry.row.editorUid})` : name;
     const linked = name === '不明' ? escapeHtml(label) : `<a href="https://www.openstreetmap.org/user/${encodeURIComponent(name)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
-    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
+    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.creates)}</td><td>${number(entry.modifies)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
   }).join('');
 
-  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新ノード数');
+  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数');
   document.querySelector('#changeset-table').innerHTML = changesets.map((entry, index) => {
     const editor = entry.row.editorName || '不明';
     return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
@@ -391,10 +434,10 @@ async function loadReport() {
 
     if (name) {
       render(data.rows);
-      document.querySelector('#report-title').textContent = `${name}の更新ノードレポート`;
+      document.querySelector('#report-title').textContent = `${name}の更新地物レポート`;
     } else {
       renderNationwide(data);
-      document.querySelector('#report-title').textContent = '日本全国の更新ノード集計';
+      document.querySelector('#report-title').textContent = '日本全国の更新地物集計';
     }
     statusElement.textContent = '';
     document.querySelector('#period').textContent = `集計期間：${formatJstDateTime(data.meta.periodStart)} ～ ${formatJstDateTime(data.meta.periodEnd)}`;
@@ -449,7 +492,7 @@ document.querySelector('#prefecture-csv').addEventListener('click', event => {
     const total = Number(currentNationwideData.total) || 0;
     (currentNationwideData.prefectures || []).forEach((row, index) => output.push(['都道府県', index + 1, row.name, '', row.count, percent(row.count, total)]));
     (currentNationwideData.categories || []).forEach((row, index) => output.push(['代表タグ', index + 1, categoryName(row), `${row.type}=${row.value}`, row.count, percent(row.count, total)]));
-    (currentNationwideData.mappers || []).forEach((row, index) => output.push(['マッパー', index + 1, row.name, row.uid || '', row.count, percent(row.count, total)]));
+    (currentNationwideData.mappers || []).forEach((row, index) => output.push(['マッパー', index + 1, row.name, `${row.uid || ''} / 新規${row.creates}件・更新${row.modifies}件`, row.count, percent(row.count, total)]));
     (currentNationwideData.changesets || []).forEach((row, index) => output.push(['変更セット', index + 1, row.changeset, row.editorName || '不明', row.count, percent(row.count, total)]));
     buildAggregateDailyRows(currentNationwideData.daily || []).forEach(row => output.push(['日別更新', row.date, '', `新規${row.create}件・更新${row.modify}件`, row.create + row.modify, percent(row.create + row.modify, total)]));
     downloadCsv(`osm-japan_${fromElement.value}_${toElement.value}.csv`, output);
@@ -458,7 +501,7 @@ document.querySelector('#prefecture-csv').addEventListener('click', event => {
 
   const total = currentReportRows.length;
   countBy(currentReportRows, row => `${row.type}=${row.value}`).forEach((entry, index) => output.push(['代表タグ', index + 1, categoryName(entry.row), entry.key, entry.count, percent(entry.count, total)]));
-  countBy(currentReportRows, row => row.editorUid || row.editorName || 'unknown').forEach((entry, index) => output.push(['マッパー', index + 1, entry.row.editorName || '不明', entry.row.editorUid || '', entry.count, percent(entry.count, total)]));
+  countMappers(currentReportRows).forEach((entry, index) => output.push(['マッパー', index + 1, entry.row.editorName || '不明', `${entry.row.editorUid || ''} / 新規${entry.creates}件・更新${entry.modifies}件`, entry.count, percent(entry.count, total)]));
   buildDailyRows(currentReportRows).forEach(entry => {
     const count = entry.create + entry.modify;
     output.push(['日別更新', entry.date, '', `新規${entry.create}件・更新${entry.modify}件`, count, percent(count, total)]);

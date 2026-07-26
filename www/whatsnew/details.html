@@ -39,18 +39,18 @@
       <p id="status" class="map-status">データを読み込んでいます…</p>
       <div id="prefecture-map" aria-label="都道府県選択地図"></div>
     </section>
-    <div class="report-heading"><div><div class="report-title-row"><h2 id="report-title">日本全国の更新ノード集計</h2><a id="prefecture-csv" class="csv-icon-button" href="#" hidden aria-label="集計リストをCSVでダウンロード" title="集計リストをCSVでダウンロード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div><p id="period"></p></div></div>
+    <div class="report-heading"><div><div class="report-title-row"><h2 id="report-title">日本全国の更新地物集計</h2><a id="prefecture-csv" class="csv-icon-button" href="#" hidden aria-label="集計リストをCSVでダウンロード" title="集計リストをCSVでダウンロード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div><p id="period"></p></div></div>
     <section class="summary" aria-label="集計概要">
-      <article><span>更新ノード</span><strong id="total">—</strong></article>
+      <article><span>更新地物</span><strong id="total">—</strong></article>
       <a class="summary-card" href="#mapper-ranking"><span>マッパー</span><strong id="mappers">—</strong><small>グラフへ移動</small></a>
       <a class="summary-card" href="#changeset-ranking"><span>変更セット数</span><strong id="changesets">—</strong><small>グラフへ移動</small></a>
     </section>
     <div class="grid">
-      <section id="prefecture-ranking"><h3>都道府県別（降順）</h3><p class="hint">全国表示時の都道府県別更新ノード数です。</p><div class="chart-wrap"><canvas id="prefecture-chart" aria-label="都道府県別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>都道府県</th><th>件数</th><th>割合</th></tr></thead><tbody id="prefecture-table"></tbody></table></section>
-      <section><h3>代表タグ別（降順）</h3><p class="hint">選択期間に追加・変更されたノードの代表タグです。</p><div class="chart-wrap"><canvas id="category-chart" aria-label="代表タグ別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>代表タグ</th><th>件数</th><th>割合</th></tr></thead><tbody id="category-table"></tbody></table></section>
-      <section id="mapper-ranking"><h3>マッパー別（降順）</h3><p class="hint">選択期間にノードを編集したアカウントです。グラフ・一覧は更新ノード数の上位100名まで表示します。</p><div class="chart-wrap"><canvas id="mapper-chart" aria-label="マッパー別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>マッパー</th><th>件数</th><th>割合</th></tr></thead><tbody id="mapper-table"></tbody></table></section>
-      <section><h3>日別更新数（日付順）</h3><p class="hint">更新日時の日ごとの件数です。</p><div class="chart-wrap chart-wrap-daily"><canvas id="daily-chart" aria-label="日付別の更新ノード数"></canvas></div><table><thead><tr><th>日付</th><th>新規</th><th>更新</th><th>合計</th></tr></thead><tbody id="daily-table"></tbody></table></section>
-      <section id="changeset-ranking" hidden><h3>変更セット別（降順）</h3><p class="hint">同じ変更セットで更新されたノードをまとめています。</p><div class="chart-wrap"><canvas id="changeset-chart" aria-label="変更セット別の更新ノード数"></canvas></div><table><thead><tr><th>順位</th><th>変更セット</th><th>マッパー</th><th>件数</th></tr></thead><tbody id="changeset-table"></tbody></table></section>
+      <section id="prefecture-ranking"><h3>都道府県別（降順）</h3><p class="hint">全国表示時の都道府県別更新地物数です。</p><div class="chart-wrap"><canvas id="prefecture-chart" aria-label="都道府県別の更新地物数"></canvas></div><table><thead><tr><th>順位</th><th>都道府県</th><th>件数</th><th>割合</th></tr></thead><tbody id="prefecture-table"></tbody></table></section>
+      <section><h3>代表タグ別（降順）</h3><p class="hint">選択期間に追加・変更された地物の代表タグです。</p><div class="chart-wrap"><canvas id="category-chart" aria-label="代表タグ別の更新地物数"></canvas></div><table><thead><tr><th>順位</th><th>代表タグ</th><th>件数</th><th>割合</th></tr></thead><tbody id="category-table"></tbody></table></section>
+      <section id="mapper-ranking"><h3>マッパー別（降順）</h3><p class="hint">選択期間に地物を編集したアカウントです。新規・更新を色分けし、合計件数の上位100名まで表示します。</p><div class="chart-wrap"><canvas id="mapper-chart" aria-label="マッパー別の新規・更新地物数"></canvas></div><table><thead><tr><th>順位</th><th>マッパー</th><th>新規</th><th>更新</th><th>合計</th><th>割合</th></tr></thead><tbody id="mapper-table"></tbody></table></section>
+      <section><h3>日別更新数（日付順）</h3><p class="hint">更新日時の日ごとの件数です。</p><div class="chart-wrap chart-wrap-daily"><canvas id="daily-chart" aria-label="日付別の更新地物数"></canvas></div><table><thead><tr><th>日付</th><th>新規</th><th>更新</th><th>合計</th></tr></thead><tbody id="daily-table"></tbody></table></section>
+      <section id="changeset-ranking" hidden><h3>変更セット別（降順）</h3><p class="hint">同じ変更セットで更新された地物をまとめています。</p><div class="chart-wrap"><canvas id="changeset-chart" aria-label="変更セット別の更新地物数"></canvas></div><table><thead><tr><th>順位</th><th>変更セット</th><th>マッパー</th><th>件数</th></tr></thead><tbody id="changeset-table"></tbody></table></section>
     </div>
   </main>
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>

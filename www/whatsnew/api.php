@@ -170,8 +170,8 @@ try {
         $stage = 'pois';
         $limit = max(1, min(5000, (int) ($_GET['limit'] ?? 1000)));
         $cursor = trim((string) ($_GET['cursor'] ?? ''));
-        $nodeConditions = $conditions;
-        $nodeParameters = $parameters;
+        $poiConditions = $conditions;
+        $poiParameters = $parameters;
 
         if ($cursor !== '') {
             $encoded = strtr($cursor, '-_', '+/');
@@ -191,19 +191,19 @@ try {
             }
 
             $typeOrder = ['node' => 1, 'way' => 2, 'relation' => 3];
-            $nodeConditions[] =
+            $poiConditions[] =
                 '(osm_timestamp < :cursor_timestamp_before'
                 . ' OR (osm_timestamp = :cursor_timestamp_equal'
                 . ' AND (FIELD(osm_type,\'node\',\'way\',\'relation\') > :cursor_type_order'
                 . ' OR (osm_type = :cursor_type AND osm_id > :cursor_id))))';
-            $nodeParameters['cursor_timestamp_before'] = $cursorValues[0];
-            $nodeParameters['cursor_timestamp_equal'] = $cursorValues[0];
-            $nodeParameters['cursor_type_order'] = $typeOrder[$cursorValues[1]];
-            $nodeParameters['cursor_type'] = $cursorValues[1];
-            $nodeParameters['cursor_id'] = $cursorValues[2];
+            $poiParameters['cursor_timestamp_before'] = $cursorValues[0];
+            $poiParameters['cursor_timestamp_equal'] = $cursorValues[0];
+            $poiParameters['cursor_type_order'] = $typeOrder[$cursorValues[1]];
+            $poiParameters['cursor_type'] = $cursorValues[1];
+            $poiParameters['cursor_id'] = $cursorValues[2];
         }
 
-        $nodeWhere = implode(' AND ', $nodeConditions);
+        $poiWhere = implode(' AND ', $poiConditions);
         $queryLimit = $limit + 1;
         $rows = $fetchAll(
             $pdo,
@@ -213,10 +213,10 @@ try {
             . ' osm_timestamp AS date, changeset_id AS changeset,'
             . ' editor_uid AS editorUid, editor_name AS editorName,'
             . ' change_action AS action'
-            . " FROM osm_poi WHERE {$nodeWhere}"
+            . " FROM osm_poi WHERE {$poiWhere}"
             . " ORDER BY osm_timestamp DESC, osm_type, osm_id"
             . " LIMIT {$queryLimit}",
-            $nodeParameters
+            $poiParameters
         );
 
         $hasMore = count($rows) > $limit;
@@ -267,6 +267,8 @@ try {
             $pdo,
             'SELECT editor_uid AS uid,'
             . " COALESCE(NULLIF(editor_name,''),'不明') AS name,"
+            . " SUM(CASE WHEN change_action = 'create' THEN 1 ELSE 0 END) AS creates,"
+            . " SUM(CASE WHEN change_action = 'create' THEN 0 ELSE 1 END) AS `modifies`,"
             . " COUNT(*) AS count FROM osm_poi WHERE {$where}"
             . ' GROUP BY editor_uid, editor_name ORDER BY count DESC, name LIMIT 100',
             $parameters
@@ -282,7 +284,7 @@ try {
         echo json_encode(
             [
                 'meta' => $meta,
-                'mappers' => $castCounts($mappers),
+                'mappers' => $castCounts($mappers, ['creates', 'modifies', 'count']),
                 'categories' => $castCounts($categories),
             ],
             JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
@@ -317,6 +319,8 @@ try {
         $pdo,
         'SELECT editor_uid AS uid,'
         . " COALESCE(NULLIF(editor_name,''),'不明') AS name,"
+        . " SUM(CASE WHEN change_action = 'create' THEN 1 ELSE 0 END) AS creates,"
+        . " SUM(CASE WHEN change_action = 'create' THEN 0 ELSE 1 END) AS `modifies`,"
         . " COUNT(*) AS count FROM osm_poi WHERE {$where}"
         . ' GROUP BY editor_uid, editor_name ORDER BY count DESC, name LIMIT 100',
         $parameters
@@ -372,7 +376,7 @@ try {
             'total' => $total,
             'changesetCount' => $changesetCount,
             'mapperCount' => $mapperCount,
-            'mappers' => $castCounts($mappers),
+            'mappers' => $castCounts($mappers, ['creates', 'modifies', 'count']),
             'changesets' => $castCounts($changesets),
             'categories' => $castCounts($categories),
             'daily' => $castCounts($daily, ['creates', 'modifies', 'count']),

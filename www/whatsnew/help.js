@@ -20,14 +20,14 @@
       <div class="map-guide-body">
         <p id="map-guide-intro" class="map-guide-intro">OpenStreetMapで日本国内に追加・編集された地物を、地図とタイムスケールで検索し、全国・都道府県別に集計するWebアプリケーションです。</p>
         <ul class="map-guide-list">
-          <li><span class="map-guide-marker is-create" aria-hidden="true"></span><span><strong>緑のピン</strong>OSMに新規作成されたノード</span></li>
-          <li><span class="map-guide-marker is-modify" aria-hidden="true"></span><span><strong>オレンジのピン</strong>既存ノードの更新</span></li>
+          <li><span class="map-guide-marker is-create" aria-hidden="true"></span><span><strong>緑のピン</strong>OSMに新規作成された地物</span></li>
+          <li><span class="map-guide-marker is-modify" aria-hidden="true"></span><span><strong>オレンジのピン</strong>既存地物の更新</span></li>
           <li><span class="map-guide-symbol" aria-hidden="true">▶</span><span><strong>タイムスケール</strong>更新された時刻に沿って地図を再生</span></li>
           <li><img class="map-guide-image" src="image/map.png" width="1254" height="1254" alt=""><span><strong>都道府県</strong>対象地域を絞り込み</span></li>
           <li><img class="map-guide-image" src="image/report.png" width="1254" height="1254" alt=""><span><strong>更新レポート</strong>タグ、編集者、日付、変更セット別に集計</span></li>
         </ul>
         <p class="map-guide-note"><strong>時刻について</strong>OSMへの登録・更新時刻を示すもので、施設の開業日や現実世界での変更日を示すものではありません。</p>
-        <p class="map-guide-scope">現在はタグ付きノードを対象としています。way・relationは対象外です。</p>
+        <p class="map-guide-scope">タグ付きノードに加え、対象タグを持つwayとmultipolygon relationを対象としています。</p>
         <section class="map-guide-about" aria-label="APIとライセンス">
           <p class="map-guide-about-description">地物を取得するAPIの使い方、利用できるクエリパラメーター、セットアップ方法、ソースコードをGitHubで公開しています。</p>
           <a class="site-info-repository map-guide-repository" href="https://github.com/K-Sakanoshita/osm-whatsnew-japan" target="_blank" rel="noopener noreferrer">
