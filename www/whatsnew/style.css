@@ -10,8 +10,8 @@ body {
 }
 
 header {
-  min-height: 68px;
-  padding: 9px 18px;
+  min-height: 60px;
+  padding: 7px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -21,9 +21,9 @@ header {
 
 header .site-logo {
   display: block;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   object-fit: contain
 }
 
@@ -207,53 +207,54 @@ header small {
 
 header nav {
   display: flex;
-  gap: 12px
+  gap: 0
 }
 
-header nav a {
-  color: #155e4a;
-  font-weight: 700;
-  white-space: nowrap
-}
-
-header nav .header-image-button {
-  display: flex;
+header nav .header-view-tab {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid #c7d8d1;
-  border-radius: 10px;
-  background: #f4f6f5;
-  box-shadow: 0 2px 7px rgba(24, 54, 44, .14);
+  min-height: 38px;
+  padding: 8px 15px;
+  border: 1px solid #a9c2b9;
+  background: #fff;
+  color: #155e4a;
+  font-weight: 700;
+  line-height: 1.2;
   text-decoration: none;
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease
+  white-space: nowrap;
+  transition: border-color .15s ease, background .15s ease, color .15s ease
 }
 
-header nav .header-image-button img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover
+header nav .header-view-tab:first-child {
+  border-radius: 8px 0 0 8px
 }
 
-header nav .header-image-button:hover {
-  border-color: #6fa391;
-  box-shadow: 0 4px 11px rgba(24, 54, 44, .2);
-  transform: translateY(-1px)
+header nav .header-view-tab:last-child {
+  margin-left: -1px;
+  border-radius: 0 8px 8px 0
 }
 
-header nav .header-image-button:focus-visible {
+header nav .header-view-tab:hover:not([aria-current="page"]) {
+  position: relative;
+  border-color: #5f9986;
+  background: #edf7f3
+}
+
+header nav .header-view-tab:focus-visible {
+  position: relative;
+  z-index: 1;
   outline: 3px solid rgba(8, 127, 91, .28);
-  outline-offset: 3px
+  outline-offset: 2px
 }
 
-header nav .header-image-button:active {
-  box-shadow: 0 1px 4px rgba(24, 54, 44, .18);
-  transform: translateY(0)
+header nav .header-view-tab[aria-current="page"] {
+  position: relative;
+  z-index: 1;
+  border-color: #12634f;
+  background: #12634f;
+  color: #fff;
+  cursor: default
 }
 
 header form {
@@ -286,6 +287,7 @@ button {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
+  padding: 0;
   border: 1px solid #bac9c1;
   border-radius: 7px;
   background: #fff;
@@ -294,7 +296,7 @@ button {
   transition: background-color .15s, border-color .15s
 }
 
-.csv-icon-button:hover {
+.csv-icon-button:hover:not(:disabled) {
   background: #e8f3ee;
   border-color: #7fa998
 }
@@ -308,6 +310,13 @@ button {
   display: none
 }
 
+.csv-icon-button:disabled {
+  border-color: #d7e1dd;
+  background: #f2f5f4;
+  color: #9ba9a4;
+  cursor: default
+}
+
 .csv-icon-button svg {
   width: 19px;
   height: 19px
@@ -315,18 +324,32 @@ button {
 
 /* 更新マップ */
 .map-page {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f8fbfa
 }
 
 .map-page main {
-  height: calc(100dvh - 68px);
-  display: flex
+  height: auto;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #f4f8f6
 }
 
 .map-page .map-shell {
   position: relative;
   flex: 1;
-  min-width: 0
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #cdded7;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(34, 76, 62, .08)
 }
 
 .map-page #map {
@@ -337,11 +360,13 @@ button {
 .map-page .map-marker-legend {
   position: absolute;
   z-index: 4;
-  bottom: 12px;
+  bottom: 40px;
   left: 12px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  max-width: calc(100% - 24px);
   padding: 6px 9px;
   border: 1px solid rgba(88, 111, 103, .38);
   border-radius: 7px;
@@ -351,7 +376,7 @@ button {
   pointer-events: none
 }
 
-.map-page .map-marker-legend span {
+.map-page .map-marker-legend>span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -362,30 +387,59 @@ button {
   line-height: 1
 }
 
-.map-page .map-marker-legend i {
-  display: inline-block;
-  width: 11px;
-  height: 11px;
-  border: 1px solid #fff;
-  border-radius: 50% 50% 50% 0;
+.map-page .map-marker-legend-item svg {
+  width: 15px;
+  height: 19px;
+  overflow: visible;
+  color: inherit;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .3))
+}
+
+.map-page .map-marker-legend-item svg path {
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 2
+}
+
+.map-page .map-marker-legend .is-create svg {
+  color: #177866
+}
+
+.map-page .map-marker-legend .is-modify svg {
+  color: #c45f32
+}
+
+.map-page .map-marker-legend-count {
+  padding-left: 10px;
+  border-left: 1px solid rgba(88, 111, 103, .3)
+}
+
+.map-page .map-marker-legend-count i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #607d8b;
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
   box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
-  transform: rotate(-45deg)
-}
-
-.map-page .map-marker-legend .is-create {
-  background: #177866
-}
-
-.map-page .map-marker-legend .is-modify {
-  background: #c45f32
+  box-sizing: border-box
 }
 
 .map-page aside {
   width: 430px;
   background: #fff;
-  border-left: 1px solid #dbe4df;
+  border: 1px solid #cdded7;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(34, 76, 62, .08);
   overflow: hidden;
-  padding: 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   min-height: 0
@@ -513,6 +567,10 @@ button {
   box-shadow: 0 2px 8px rgba(24, 54, 44, .12)
 }
 
+.map-page .prefecture-filter[hidden] {
+  display: none
+}
+
 .map-page .poi-type-filter {
   margin: 0 0 5px;
   padding: 0 1px
@@ -598,12 +656,24 @@ button {
   text-overflow: ellipsis
 }
 
+.map-page .timeline-summary>strong,
+.map-page #timeline-summary-datetime,
 .map-page #timeline-summary-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  line-height: 1.2
+}
+
+.map-page #timeline-summary-datetime,
+.map-page #timeline-summary-count {
+  font-weight: 700;
   font-variant-numeric: tabular-nums
 }
 
 .map-page .timeline-summary-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-left: auto
 }
@@ -629,32 +699,6 @@ button {
 }
 
 .map-page .timeline-details[hidden] {
-  display: none
-}
-
-.map-page .timeline-prefecture-control {
-  position: absolute;
-  top: 7px;
-  left: 0;
-  display: flex;
-  align-items: center
-}
-
-.map-page .timeline-prefecture {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: #f08024;
-  color: #fff;
-  font-size: 14px;
-  line-height: 1.2;
-  box-shadow: 0 1px 3px rgba(80, 35, 8, .25)
-}
-
-.map-page .timeline-prefecture[hidden] {
   display: none
 }
 
@@ -700,19 +744,6 @@ button {
   outline-offset: 2px
 }
 
-.map-page .timeline.has-prefecture output {
-  padding-inline: 105px 8px
-}
-
-.map-page .timeline output {
-  display: block;
-  white-space: nowrap;
-  text-align: center;
-  font-weight: 800;
-  color: #174d3e;
-  margin-bottom: 4px
-}
-
 .map-page .timeline input {
   display: block;
   width: 100%;
@@ -743,6 +774,22 @@ button {
 .map-page .timeline-controls button:disabled {
   opacity: .45;
   cursor: not-allowed
+}
+
+.map-page .timeline-region-button {
+  height: 30px;
+  padding: 0 12px;
+  border-color: #8daaa0;
+  background: #fff;
+  color: #0b654f;
+  font-size: 12px;
+  line-height: 1
+}
+
+.map-page .timeline-region-button[aria-expanded="true"] {
+  border-color: #0b654f;
+  background: #0b654f;
+  color: #fff
 }
 
 .map-page .timeline-icon-button,
@@ -1141,9 +1188,9 @@ button {
 
 /* 全国・都道府県別レポート */
 .details-page main {
-  max-width: 1500px;
+  max-width: 1440px;
   margin: auto;
-  padding: 20px 22px 40px
+  padding: 18px 22px 48px
 }
 
 .details-page .report-heading {
@@ -1169,22 +1216,6 @@ button {
   gap: 8px
 }
 
-.details-page .report-title-row .csv-icon-button {
-  width: 28px;
-  height: 28px
-}
-
-.details-page .report-title-row .csv-icon-button svg {
-  width: 17px;
-  height: 17px
-}
-
-.details-page .report-title-row .csv-icon-button[hidden] {
-  display: inline-flex;
-  visibility: hidden;
-  pointer-events: none
-}
-
 .details-page #status {
   position: absolute;
   z-index: 3;
@@ -1208,11 +1239,12 @@ button {
 
 .details-page .prefecture-map-panel {
   position: relative;
-  margin-bottom: 18px;
-  border: 1px solid #dbe4df;
-  border-radius: 11px;
+  margin-bottom: 20px;
+  border: 1px solid #cdded7;
+  border-radius: 14px;
   overflow: hidden;
-  background: #fff
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(34, 76, 62, .08)
 }
 
 .details-page .map-guide {
@@ -1295,6 +1327,14 @@ button {
   word-break: keep-all
 }
 
+.details-page .map-guide-date-separator {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: #40564e;
+  font-size: 12px
+}
+
 .details-page .map-guide-dates select {
   padding: 4px 6px;
   border: 1px solid #b9c9c1;
@@ -1314,22 +1354,36 @@ button {
 }
 
 .details-page #prefecture-map {
-  height: 410px
+  height: 350px
 }
 
 .details-page .summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin: 16px 0
+  margin: 18px 0
 }
 
 .details-page .summary article,
 .details-page .summary-card {
-  padding: 15px;
+  position: relative;
+  min-height: 92px;
+  padding: 16px 18px;
   background: #fff;
-  border: 1px solid #dbe4df;
-  border-radius: 10px
+  border: 1px solid #d4e2dc;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(34, 76, 62, .06);
+  box-sizing: border-box
+}
+
+.details-page .summary article {
+  border-color: #12634f;
+  background: linear-gradient(135deg, #12634f, #177d63)
+}
+
+.details-page .summary article span,
+.details-page .summary article strong {
+  color: #fff
 }
 
 .details-page .summary span {
@@ -1348,7 +1402,16 @@ button {
 .details-page .summary-card {
   color: inherit;
   text-decoration: none;
-  transition: border-color .15s, box-shadow .15s
+  transition: transform .15s, border-color .15s, box-shadow .15s
+}
+
+.details-page .summary-card::after {
+  content: "→";
+  position: absolute;
+  top: 16px;
+  right: 17px;
+  color: #6e9487;
+  font-size: 20px
 }
 
 .details-page .summary-card small {
@@ -1363,14 +1426,15 @@ button {
 .details-page .summary-card:hover,
 .details-page .summary-card:focus-visible {
   border-color: #7fa998;
-  box-shadow: 0 2px 8px rgba(24, 54, 44, .14);
+  box-shadow: 0 7px 18px rgba(24, 54, 44, .13);
+  transform: translateY(-2px);
   outline: none
 }
 
 .details-page .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px
+  gap: 18px
 }
 
 .details-page #mapper-ranking,
@@ -1381,14 +1445,41 @@ button {
 .details-page .grid section {
   min-width: 0;
   background: #fff;
-  border: 1px solid #dbe4df;
-  border-radius: 10px;
-  padding: 15px
+  border: 1px solid #d5e2dc;
+  border-top: 4px solid #2a8c71;
+  border-radius: 13px;
+  padding: 17px 18px 16px;
+  box-shadow: 0 4px 16px rgba(34, 76, 62, .07)
 }
 
 .details-page h3 {
   margin: 0;
-  font-size: 17px
+  color: #173f34;
+  font-size: 18px;
+  letter-spacing: .01em
+}
+
+.details-page .ranking-heading,
+.details-page .category-mapper-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.details-page .ranking-heading {
+  justify-content: space-between
+}
+
+.details-page .ranking-heading .csv-icon-button,
+.details-page .category-mapper-actions .csv-icon-button {
+  width: 30px;
+  height: 30px
+}
+
+.details-page .ranking-heading .csv-icon-button svg,
+.details-page .category-mapper-actions .csv-icon-button svg {
+  width: 24px;
+  height: 24px
 }
 
 .details-page .hint {
@@ -1400,11 +1491,117 @@ button {
 .details-page .chart-wrap {
   position: relative;
   height: 310px;
-  margin: 4px 0 16px
+  margin: 6px 0 14px;
+  padding: 8px 8px 2px;
+  border-radius: 9px;
+  background: #fbfdfc;
+  box-sizing: border-box
 }
 
 .details-page .chart-wrap-daily {
   height: 310px
+}
+
+.details-page .ranking-details {
+  border-top: 1px solid #dce8e3
+}
+
+.details-page .ranking-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  background: #edf5f1;
+  color: #155e4a;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none
+}
+
+.details-page .ranking-details summary::-webkit-details-marker {
+  display: none
+}
+
+.details-page .ranking-details summary::after {
+  content: "＋";
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1
+}
+
+.details-page .ranking-details[open] summary::after {
+  content: "−"
+}
+
+.details-page .ranking-details[open] summary {
+  margin-bottom: 9px;
+  background: #e4f0eb
+}
+
+.details-page .ranking-filter {
+  width: 100%;
+  margin: 0 0 9px;
+  padding: 9px 11px;
+  border: 1px solid #b8cbc3;
+  border-radius: 7px;
+  background: #fbfdfc;
+  color: #243d35;
+  font: inherit;
+  box-sizing: border-box
+}
+
+.details-page .ranking-filter:focus {
+  border-color: #178467;
+  outline: 3px solid rgba(23, 132, 103, .16)
+}
+
+.details-page .category-mapper-button {
+  padding: 5px 8px;
+  border-color: #8daaa0;
+  background: #fff;
+  color: #155e4a;
+  font-size: 11px;
+  white-space: nowrap
+}
+
+.details-page .category-mapper-ranking {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid #cbdcd5
+}
+
+.details-page .category-mapper-ranking[hidden] {
+  display: none
+}
+
+.details-page .category-mapper-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px
+}
+
+.details-page .category-mapper-heading h4 {
+  margin: 0;
+  color: #173f34;
+  font-size: 16px
+}
+
+.details-page .category-mapper-heading p {
+  margin: 3px 0 0;
+  color: #6b7b74;
+  font-size: 11px
+}
+
+.details-page .category-mapper-heading button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-color: #8daaa0;
+  background: #fff;
+  color: #155e4a;
+  font-size: 11px
 }
 
 .details-page table {
@@ -1549,7 +1746,7 @@ button {
 
   .map-page header,
   .details-page header {
-    min-height: 74px;
+    min-height: 66px;
     height: auto;
     padding: 8px 12px;
     gap: 8px
@@ -1557,9 +1754,9 @@ button {
 
   .map-page header .site-logo,
   .details-page header .site-logo {
-    width: 40px;
-    height: 40px;
-    flex-basis: 40px
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px
   }
 
   .map-page header h1,
@@ -1568,20 +1765,26 @@ button {
   }
 
   .map-page main {
-    height: calc(100dvh - 74px);
-    flex-direction: column
+    height: auto;
+    flex-direction: column;
+    gap: 0;
+    padding: 0
   }
 
   .map-page .map-shell {
     height: 62%;
-    flex: none
+    flex: none;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    box-shadow: none
   }
 
   .map-page aside {
     width: 100%;
     height: 38%;
-    border-left: 0;
-    border-top: 1px solid #dbe4df
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none
   }
 
   .map-page .timeline,
@@ -1627,9 +1830,9 @@ button {
 
   .map-page header,
   .details-page header {
-    min-height: 70px;
+    min-height: 62px;
     height: auto;
-    padding: 7px 10px;
+    padding: 5px 10px;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 5px 12px
@@ -1637,9 +1840,9 @@ button {
 
   .map-page header .site-logo,
   .details-page header .site-logo {
-    width: 34px;
-    height: 34px;
-    flex-basis: 34px
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px
   }
 
   .map-page header>div,
@@ -1668,16 +1871,11 @@ button {
     justify-self: end
   }
 
-  .map-page header nav a,
-  .details-page header nav a {
-    font-size: 13px
-  }
-
-  .map-page header nav .header-image-button,
-  .details-page header nav .header-image-button {
-    width: 44px;
-    height: 44px;
-    flex-basis: 44px
+  .map-page header nav .header-view-tab,
+  .details-page header nav .header-view-tab {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 12px
   }
 
   .map-page header form,
@@ -1701,7 +1899,7 @@ button {
   }
 
   .map-page main {
-    height: calc(100dvh - 70px)
+    height: auto
   }
 
   .map-page .map-shell {
@@ -1752,27 +1950,6 @@ button {
     min-width: 50px;
     padding: 6px 7px;
     font-size: 11px
-  }
-
-  .map-page .timeline-prefecture-control {
-    top: 7px;
-    left: 10px
-  }
-
-  .map-page .timeline-prefecture {
-    max-width: 90px;
-    padding: 3px 7px;
-    font-size: 12px
-  }
-
-  .map-page .timeline.has-prefecture output {
-    padding-inline: 78px 2px
-  }
-
-  .map-page .timeline output {
-    font-size: 11px;
-    line-height: 1.25;
-    margin-bottom: 5px
   }
 
   .map-page .timeline-dates {
@@ -1937,45 +2114,6 @@ button {
     font-size: 11px
   }
 }
-/* 地図画面の初回ガイド */
-header>.header-help-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  padding: 0;
-  border: 1px solid #c7d8d1;
-  border-radius: 10px;
-  background: #f4f6f5;
-  color: #155e4a;
-  box-shadow: 0 2px 7px rgba(24, 54, 44, .14);
-  cursor: pointer;
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease
-}
-
-header>.header-help-button svg {
-  width: 25px;
-  height: 25px
-}
-
-header>.header-help-button:hover {
-  border-color: #6fa391;
-  box-shadow: 0 4px 11px rgba(24, 54, 44, .2);
-  transform: translateY(-1px)
-}
-
-header>.header-help-button:focus-visible {
-  outline: 3px solid rgba(8, 127, 91, .28);
-  outline-offset: 3px
-}
-
-header>.header-help-button:active {
-  box-shadow: 0 1px 4px rgba(24, 54, 44, .18);
-  transform: translateY(0)
-}
-
 .map-guide-dialog {
   width: min(620px, calc(100vw - 32px));
   max-width: none;
@@ -2225,21 +2363,9 @@ header>.header-help-button:active {
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom))
   }
 
-  header>.header-help-button {
-    width: 44px;
-    height: 44px;
-    flex-basis: 44px
-  }
 }
 
 @media(max-width:700px) and (max-aspect-ratio:1/1) {
-  header>.header-help-button {
-    grid-column: 3;
-    grid-row: 1;
-    justify-self: end;
-    margin-right: 50px
-  }
-
   .map-page header nav {
     grid-column: 3;
     grid-row: 1;
@@ -2251,22 +2377,19 @@ header>.header-help-button:active {
     text-overflow: ellipsis
   }
 
-  .map-page header .site-info-trigger {
+  .map-page header .site-info-trigger,
+  .details-page header .site-info-trigger {
     max-width: 100%
   }
 
-  .map-page header .site-info-trigger span {
+  .map-page header .site-info-trigger span,
+  .details-page header .site-info-trigger span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap
   }
 }
 
-@media(prefers-reduced-motion:reduce) {
-  header>.header-help-button {
-    transition: none
-  }
-}
 .map-guide-about {
   margin-top: 22px;
   padding-top: 20px;
@@ -2325,6 +2448,16 @@ header>.header-help-button:active {
   margin-top: 14px;
   color: #60736e;
   font-size: 12px
+}
+
+.map-guide-about .map-guide-operator {
+  margin-top: 14px;
+  color: #40564f;
+  font-size: 12px
+}
+
+.map-guide-operator strong {
+  color: #173f34
 }
 
 @media(max-width:700px) {

@@ -5,12 +5,13 @@ OpenStreetMap本家APIの変更セットから、日本周辺で追加・編集�
 ## 主な機能
 
 - 更新された地物をMapLibre地図とタイムスケールで再生
+- 「地図」と「更新レポート」を共通タブから切り替え
 - 初回利用ガイドと、地図・更新レポートの両画面から開ける共通ヘルプ
-- 都道府県ミニマップと代表タグの種別選択による絞り込み、都道府県境界表示
-- 全国および都道府県別の件数、代表タグ、マッパー、日別更新数の集計
-- 全国の都道府県・マッパー・代表タグ・日別ランキングを更新レポートへ統合
+- 必要なときに開ける都道府県ミニマップと、代表タグの種別選択による絞り込み
+- 全国および都道府県別の件数、代表タグ、マッパー、日別更新数、変更セットの集計
+- 代表タグごとのマッパー内訳と、新規・更新件数の表示
 - 期間、都道府県、マッパー、代表タグ、新規・更新種別によるAPI検索
-- GeoJSON／CSVダウンロードと地図表示URLの共有
+- 地図データのGeoJSON出力、更新レポート各リストの個別CSV出力、地図表示URLの共有
 
 Webアプリケーションは `www/whatsnew/` にあります。
 
@@ -23,7 +24,7 @@ Webアプリケーションは `www/whatsnew/` にあります。
 | `sync.php` | OSM変更セットを取得するCLI専用同期処理 |
 | `schema.sql` | MySQLテーブルとAPI用インデックス |
 | `data/` | カテゴリ、マーカー、都道府県GeoJSON |
-| `tiles/` | MapLibre用OSMFJ POIスタイル |
+| `tiles/` | MapLibre用地図スタイル |
 
 ## 必要環境
 
@@ -63,6 +64,14 @@ return [
 ```
 
 `private-osm-config.php` は `.gitignore` の対象です。GitHubやWeb公開ディレクトリへ配置しないでください。
+
+ブラウザー側は `www/whatsnew/data/config.jsonc` の `apiUrl` から更新データを取得します。公開先またはローカル確認先の `api.php` を絶対URLで指定してください。
+
+```jsonc
+{
+  "apiUrl": "https://example.com/whatsnew/api.php"
+}
+```
 
 ### 2. データベース
 
@@ -108,6 +117,29 @@ OSM_APP_CONFIG=/absolute/path/to/config.php ./scripts/test-env.sh start
 `stop`はWebアプリとphpMyAdminを停止します。他のアプリケーションへの影響を避けるため、MySQLサービスは停止しません。PIDとログは`/tmp/osm-whatnew-japan-ユーザーID/`へ生成されます。保存先は`TEST_RUNTIME_DIR`で変更できます。
 
 既存DBのパスワードが空の場合、スクリプトから起動したローカルphpMyAdminに限って空パスワードでのログインを許可します。この場合、phpMyAdminを`127.0.0.1`または`localhost`以外では起動できません。システムのphpMyAdmin設定とMySQLユーザーは変更しません。
+
+外部DBへ接続できない開発PCでは、ローカル完結のテスト環境を使用できます。MariaDBとphpMyAdminはDockerで起動し、WebはホストのPHP内蔵サーバーから作業ツリーの`www/whatsnew/`を直接参照します。MariaDBの初回起動時に`schema.sql`を自動適用し、公開環境用の`private-osm-config.php`は使用・変更しません。
+
+```shell
+./scripts/test-env-docker.sh start
+./scripts/test-env-docker.sh status
+./scripts/test-env-docker.sh logs
+./scripts/test-env-docker.sh stop
+```
+
+Webアプリは既定で全ネットワークインターフェースのポート`8000`を待ち受けます。このPCでは `http://127.0.0.1:8000/`、同じLAN内の機器からは `http://このPCのIPアドレス:8000/` で接続できます。MariaDBは`127.0.0.1:3307`、phpMyAdminは `http://127.0.0.1:8081/` です。ポートは環境変数で変更できます。
+
+```shell
+WEB_PORT=8080 MYSQL_PORT=3308 PHPMYADMIN_PORT=8082 ./scripts/test-env-docker.sh start
+```
+
+DBデータはDocker volumeに保持されるため、`stop`後も残ります。ローカルDBの接続情報はテスト環境内だけで使用する固定値です。Webは作業ツリーを直接参照するため、HTML、CSS、JavaScript、PHPの変更はコンテナの再ビルドなしでブラウザー再読み込み時に反映されます。
+
+phpMyAdminからアップロードできるSQLファイルは最大1GiBです。非常に大きなSQLや、ブラウザー経由でタイムアウトするSQLは、起動中のテスト環境へコマンドで直接インポートできます。
+
+```shell
+./scripts/test-env-docker.sh import /absolute/path/to/dump.sql
+```
 
 ### 4. OSM同期
 

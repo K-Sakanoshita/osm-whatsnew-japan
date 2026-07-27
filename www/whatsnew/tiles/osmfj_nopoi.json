@@ -5,7 +5,7 @@
         "openmaptiles": {
             "url": "https://tile.openstreetmap.jp/data/planet.json",
             "type": "vector",
-            "attribution": "Hosted by OSMFJ(no Poi) | <a href=\"https://openstreetmap.org\">&copy OpenStreetMap </a>"
+            "attribution": "<a href=\"https://openstreetmap.org\">&copy OpenStreetMap </a>"
         }
     },
     "layers": [

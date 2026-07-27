@@ -43,10 +43,12 @@ const map = new maplibregl.Map({
   zoom: initialZoom,
   minZoom: 2,
   maxBounds: [[118, 18], [158, 60]],
+  pitchWithRotate: true,
+  touchPitch: true,
   fadeDuration: 0,
-  style: './tiles/osmfj_poi.json',
+  style: './tiles/osmfj_nopoi.json',
 });
-map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), 'bottom-right');
 
 
 const status = document.querySelector('#status');
@@ -55,18 +57,16 @@ const listScroller = list;
 const poiTypeSelect = document.querySelector('#poi-type');
 const timeline = document.querySelector('#timeline');
 const range = document.querySelector('#time-range');
-const timelineLabel = document.querySelector('#timeline-label');
-const timelinePrefecture = document.querySelector('#timeline-prefecture');
 const timelineSummaryPrefecture = document.querySelector('#timeline-summary-prefecture');
-const timelineSummaryPeriod = document.querySelector('#timeline-summary-period');
+const timelineSummaryDatetime = document.querySelector('#timeline-summary-datetime');
 const timelineSummaryCount = document.querySelector('#timeline-summary-count');
 const timelineDetails = document.querySelector('#timeline-details');
 const timelineToggle = document.querySelector('#timeline-toggle');
 const summaryPlayButton = document.querySelector('#summary-play-timeline');
 const timeStart = document.querySelector('#time-start');
 const timeEnd = document.querySelector('#time-end');
-const playButton = document.querySelector('#play-timeline');
-const pauseButton = document.querySelector('#pause-timeline');
+const prefectureFilter = document.querySelector('#prefecture-filter');
+const prefectureFilterToggle = document.querySelector('#prefecture-filter-toggle');
 const timelineStep = document.querySelector('#timeline-step');
 const days = document.querySelector('#days');
 if ([...days.options].some(option => option.value === requestedDaysValue)) days.value = requestedDaysValue;
@@ -145,6 +145,8 @@ let initialLoadStarted = false;
 let shareFeedbackTimer = null;
 let resumePlaybackAfterGuide = false;
 let automaticPlaybackPending = false;
+let apiUrl = '';
+let configurationPromise = null;
 const PREFECTURE_MINI_SOURCE = 'mini-prefectures';
 const PREFECTURE_MINI_FILL_LAYER = 'mini-prefectures-fill';
 const PREFECTURE_MINI_SELECTED_LAYER = 'mini-prefectures-selected';
@@ -156,13 +158,13 @@ const prefectureName = feature => String(feature?.properties?.['name:ja'] || fea
 const prefectureCode = feature => String(feature?.properties?.['ISO3166-2'] || '').toUpperCase();
 
 function updateTimelineSummary() {
-  const shortDate = value => {
-    const [, month, day] = String(value || '').split('-');
-    return month && day ? `${Number(month)}/${Number(day)}` : '—';
-  };
   timelineSummaryPrefecture.textContent = selectedPrefecture || '全国';
-  timelineSummaryPeriod.textContent = `${shortDate(dateFrom.value)}〜${shortDate(dateTo.value)}`;
-  timelineSummaryCount.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件`;
+  if (!markerEntries.length) {
+    timelineSummaryDatetime.textContent = '対象日時 —';
+    timelineSummaryDatetime.removeAttribute('datetime');
+    timelineSummaryDatetime.removeAttribute('title');
+  }
+  timelineSummaryCount.textContent = '更新0件（累積0件）';
 }
 
 const parseUtcDate = value => {
@@ -177,6 +179,13 @@ const fmt = value => {
     hourCycle: 'h23', timeZone: 'Asia/Tokyo',
   }).formatToParts(parseUtcDate(value)).map(part => [part.type, part.value]));
   return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute} (JST)`;
+};
+const fmtTimelineSummary = value => {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: 'numeric',
+    hourCycle: 'h23', timeZone: 'Asia/Tokyo',
+  }).formatToParts(parseUtcDate(value)).map(part => [part.type, part.value]));
+  return `${parts.month}/${parts.day} ${parts.hour}時`;
 };
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -379,10 +388,7 @@ function ensureMainPrefectureLayers() {
 function updatePrefectureMiniMapSelection() {
   prefectureFilterReset.disabled = !selectedPrefecture;
   prefectureFilterReset.hidden = !selectedPrefecture;
-  timelinePrefecture.textContent = selectedPrefecture || '全国';
   updateTimelineSummary();
-  timelinePrefecture.hidden = false;
-  timeline.classList.add('has-prefecture');
   if (prefectureMiniMap?.getLayer(PREFECTURE_MINI_SELECTED_LAYER)) {
     prefectureMiniMap.setFilter(PREFECTURE_MINI_SELECTED_LAYER, ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture]);
   }
@@ -411,6 +417,12 @@ const poiTypeKey = item => JSON.stringify([
 ]);
 
 const excludedPoiTypeTags = new Set([
+  'disused:amenity',
+  'disused:shop',
+  'disused:tourism',
+  'disused:emergency',
+  'disused:office',
+  'brand',
   'name',
   'ele',
   'addr:block_number',
@@ -421,14 +433,30 @@ const excludedPoiTypeTags = new Set([
   'bath:type',
 ]);
 
+const OTHER_POI_TYPE_KEY = '__other__';
+const poiTypeOptionKey = item => (
+  excludedPoiTypeTags.has(String(item.type ?? '').trim())
+    ? OTHER_POI_TYPE_KEY
+    : poiTypeKey(item)
+);
+
 function updatePoiTypeOptions(items) {
   const optionsByKey = new Map();
   items.forEach(item => {
-    if (excludedPoiTypeTags.has(String(item.type ?? '').trim())) return;
-    const key = poiTypeKey(item);
+    const key = poiTypeOptionKey(item);
     const current = optionsByKey.get(key);
     if (current) {
       current.count++;
+      return;
+    }
+    if (key === OTHER_POI_TYPE_KEY) {
+      optionsByKey.set(key, {
+        key,
+        label: 'その他',
+        tag: '',
+        count: 1,
+        isOther: true,
+      });
       return;
     }
     const tag = `${item.type || '—'}=${item.kind || '—'}`;
@@ -437,11 +465,13 @@ function updatePoiTypeOptions(items) {
       label: item.categoryName || tag,
       tag,
       count: 1,
+      isOther: false,
     });
   });
 
   const options = [...optionsByKey.values()].sort((left, right) => (
-    left.label.localeCompare(right.label, 'ja')
+    Number(left.isOther) - Number(right.isOther)
+      || left.label.localeCompare(right.label, 'ja')
       || left.tag.localeCompare(right.tag)
   ));
   poiTypeSelect.replaceChildren();
@@ -452,7 +482,9 @@ function updatePoiTypeOptions(items) {
   options.forEach(entry => {
     const option = document.createElement('option');
     option.value = entry.key;
-    option.textContent = `${entry.label}（${entry.tag}・${entry.count.toLocaleString('ja-JP')}件）`;
+    option.textContent = entry.isOther
+      ? `${entry.label}（${entry.count.toLocaleString('ja-JP')}件）`
+      : `${entry.label}（${entry.tag}・${entry.count.toLocaleString('ja-JP')}件）`;
     poiTypeSelect.append(option);
   });
 
@@ -471,7 +503,7 @@ async function applyPrefectureFilter(fitMap = false) {
   const areaItems = filterPoiItems(feature);
   updatePoiTypeOptions(areaItems);
   const filteredItems = selectedPoiType
-    ? areaItems.filter(item => poiTypeKey(item) === selectedPoiType)
+    ? areaItems.filter(item => poiTypeOptionKey(item) === selectedPoiType)
     : areaItems;
   await show(filteredItems);
   if (!filteredItems.length) {
@@ -508,7 +540,7 @@ async function initializePrefectureMiniMap() {
     keyboard: true,
     doubleClickZoom: true,
     touchZoomRotate: false,
-    style: './tiles/osmfj_poi.json',
+    style: './tiles/osmfj_nopoi.json',
   });
   prefectureMiniMap.addControl(new maplibregl.NavigationControl({showCompass: false}), 'top-right');
   prefectureMiniMap.on('load', () => {
@@ -577,7 +609,7 @@ async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '', 
     });
     if (prefectureValue) query.set('prefecture', prefectureValue);
     if (cursor) query.set('cursor', cursor);
-    const data = await json(`api.php?${query}`, signal);
+    const data = await json(`${apiUrl}?${query}`, signal);
     const batch = Array.isArray(data.items) ? data.items : [];
     rows.push(...batch);
     status.textContent = `${rows.length.toLocaleString('ja-JP')}件を読み込み中…`;
@@ -596,6 +628,19 @@ async function jsonc(url) {
     .filter(line => !/^\s*\/\//.test(line))
     .join('\n');
   return JSON.parse(withoutComments);
+}
+
+function loadConfiguration() {
+  if (!configurationPromise) {
+    configurationPromise = jsonc('data/config.jsonc').then(configuration => {
+      const configuredApiUrl = String(configuration.apiUrl || '').trim();
+      if (!/^https?:\/\//.test(configuredApiUrl)) {
+        throw new Error('data/config.jsonc の apiUrl に絶対URLを指定してください。');
+      }
+      apiUrl = configuredApiUrl;
+    });
+  }
+  return configurationPromise;
 }
 
 async function loadDefinitions() {
@@ -672,8 +717,6 @@ function pauseTimeline() {
     cancelAnimationFrame(playbackFrame);
     playbackFrame = null;
   }
-  playButton.disabled = false;
-  pauseButton.disabled = true;
   summaryPlayButton.textContent = '再生';
   summaryPlayButton.setAttribute('aria-label', 'タイムラインを再生');
 }
@@ -737,8 +780,6 @@ function playTimeline() {
   pauseTimeline();
   if (Number(range.value) >= Number(range.max)) range.value = range.min;
   isPlaying = true;
-  playButton.disabled = true;
-  pauseButton.disabled = false;
   summaryPlayButton.textContent = '停止';
   summaryPlayButton.setAttribute('aria-label', 'タイムラインを停止');
   updateHighlight();
@@ -1029,7 +1070,10 @@ function updateHighlight() {
   else renderVirtualList(true);
 
   const highlighted = Math.max(0, highlightEnd - highlightStart);
-  timelineLabel.textContent = `${fmt(selected)} 差分${highlighted}件/累積${visible}件`;
+  timelineSummaryDatetime.textContent = `対象日時 ${fmtTimelineSummary(selected)}`;
+  timelineSummaryDatetime.dateTime = new Date(selected).toISOString();
+  timelineSummaryDatetime.title = fmt(selected);
+  timelineSummaryCount.textContent = `更新${highlighted.toLocaleString('ja-JP')}件（累積${visible.toLocaleString('ja-JP')}件）`;
   status.textContent = `${selectedPrefecture ? `${selectedPrefecture}：` : ''}${markerEntries.length}件中 ${visible}件を表示`;
 }
 function showOsmMenu(entry, syncList = true) {
@@ -1143,8 +1187,6 @@ function setupTimeline(items) {
   timeEnd.textContent = fmt(max);
   // Keep the timeline hidden until the POI source has finished rendering.
   range.disabled = false;
-  playButton.disabled = false;
-  pauseButton.disabled = true;
   updateHighlight();
   return restoredSharedTime;
 }
@@ -1396,6 +1438,7 @@ async function load() {
     if (!dateFrom.value || !dateTo.value || dateFrom.value > dateTo.value) {
       throw new Error('開始日と終了日を正しく選択してください。');
     }
+    await loadConfiguration();
     const [output] = await Promise.all([
       loadAllPois(days.value, dateFrom.value, dateTo.value, selectedPrefecture, controller.signal),
       loadDefinitions(),
@@ -1432,16 +1475,21 @@ range.addEventListener('change', () => {
   range.value = String(Math.min(Number(range.max), Math.max(minimum, snapped)));
   updateHighlight();
 });
-playButton.addEventListener('click', playTimeline);
-pauseButton.addEventListener('click', pauseTimeline);
 summaryPlayButton.addEventListener('click', () => {
   if (isPlaying) pauseTimeline();
   else playTimeline();
 });
+prefectureFilterToggle.addEventListener('click', () => {
+  const expanded = prefectureFilterToggle.getAttribute('aria-expanded') === 'true';
+  prefectureFilterToggle.setAttribute('aria-expanded', String(!expanded));
+  prefectureFilter.hidden = expanded;
+  renderVirtualList(true);
+  if (!expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
+});
 timelineToggle.addEventListener('click', () => {
   const expanded = timelineToggle.getAttribute('aria-expanded') !== 'true';
   timelineToggle.setAttribute('aria-expanded', String(expanded));
-  timelineToggle.textContent = expanded ? '閉じる' : '条件変更';
+  timelineToggle.textContent = expanded ? '閉じる' : '詳細';
   timelineDetails.hidden = !expanded;
 });
 timelineStep.addEventListener('change', () => {

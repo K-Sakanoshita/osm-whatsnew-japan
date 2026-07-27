@@ -7,9 +7,11 @@ let prefectureFeatures = [];
 let selectedPrefecture = '';
 let categoryRules = {};
 let prefectureMap = null;
-let currentReportRows = [];
-let currentNationwideData = null;
+let currentCategoryEntries = [];
 let pendingPrefectureCounts = null;
+let apiUrl = '';
+let categoryMapperRequest = 0;
+const csvLists = {};
 const charts = {};
 const CREATE_COLOR = '#177866';
 const MODIFY_COLOR = '#c45f32';
@@ -51,6 +53,45 @@ function downloadCsv(filename, rows) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function clearCsvList(key) {
+  delete csvLists[key];
+  const button = document.querySelector(`[data-csv-list="${key}"]`);
+  if (button) button.disabled = true;
+}
+
+function setCsvList(key, rows) {
+  csvLists[key] = rows;
+  const button = document.querySelector(`[data-csv-list="${key}"]`);
+  if (button) button.disabled = rows.length <= 1;
+}
+
+function resetCsvLists() {
+  document.querySelectorAll('[data-csv-list]').forEach(button => {
+    button.disabled = true;
+  });
+  Object.keys(csvLists).forEach(key => delete csvLists[key]);
+}
+
+function csvFileScope() {
+  const name = selectedPrefectureName() || 'japan';
+  return name.replace(/[\/:*?"<>|]/g, '_');
+}
+
+function mapperCsvRows(entries, total) {
+  return [
+    ['順位', 'マッパー', 'ユーザーID', '新規', '更新', '合計', '割合'],
+    ...entries.map((entry, index) => [
+      index + 1,
+      entry.row.editorName || '不明',
+      entry.row.editorUid || '',
+      entry.creates,
+      entry.modifies,
+      entry.count,
+      percent(entry.count, total),
+    ]),
+  ];
+}
+
 async function fetchJson(url) {
   const response = await fetch(url);
   const text = await response.text();
@@ -75,7 +116,7 @@ async function fetchAllPois(baseQuery) {
     query.set('mode', 'pois');
     query.set('limit', '2000');
     if (cursor) query.set('cursor', cursor);
-    const data = await fetchJson(`api.php?${query}`);
+    const data = await fetchJson(`${apiUrl}?${query}`);
     meta = data.meta;
     const batch = Array.isArray(data.items) ? data.items : [];
     rows.push(...batch.map(item => ({
@@ -127,7 +168,7 @@ async function loadPrefectureCounts() {
       from: fromElement.value,
       to: toElement.value,
     });
-    prefectureCountsCache.set(key, fetchJson(`api.php?${query}`).then(data => data.items));
+    prefectureCountsCache.set(key, fetchJson(`${apiUrl}?${query}`).then(data => data.items));
   }
   return prefectureCountsCache.get(key);
 }
@@ -215,11 +256,39 @@ function countMappers(rows) {
   return [...counts.values()].sort((a, b) => b.count - a.count || String(a.key).localeCompare(String(b.key), 'ja'));
 }
 
+async function fillMapperActionCounts(data, baseQuery) {
+  const mappers = Array.isArray(data.mappers) ? data.mappers : [];
+  if (!mappers.some(row => row.creates === undefined || row.modifies === undefined)) return data;
+
+  const fetchActionMappers = action => {
+    const query = new URLSearchParams(baseQuery);
+    query.set('mode', 'facets');
+    query.set('action', action);
+    return fetchJson(`${apiUrl}?${query}`);
+  };
+  const [createsData, modifiesData] = await Promise.all([
+    fetchActionMappers('create'),
+    fetchActionMappers('modify'),
+  ]);
+  const mapperKey = row => row.uid ? `uid:${row.uid}` : `name:${row.name || '不明'}`;
+  const creates = new Map((createsData.mappers || []).map(row => [mapperKey(row), Number(row.count) || 0]));
+  const modifies = new Map((modifiesData.mappers || []).map(row => [mapperKey(row), Number(row.count) || 0]));
+  mappers.forEach(row => {
+    const key = mapperKey(row);
+    const count = Number(row.count) || 0;
+    const createCount = creates.get(key);
+    const modifyCount = modifies.get(key);
+    row.creates = createCount ?? Math.max(0, count - (modifyCount || 0));
+    row.modifies = modifyCount ?? Math.max(0, count - row.creates);
+  });
+  return data;
+}
+
 function categoryName(row) {
   return categoryRules[row.type]?.[row.value] || row.value || '不明';
 }
 
-function renderHorizontalChart(id, entries, labelBuilder, datasetLabel) {
+function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect) {
   charts[id]?.destroy();
   const top = entries.slice(0, 10);
   charts[id] = new Chart(document.querySelector(`#${id}`), {
@@ -235,14 +304,18 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel) {
       animation: false,
       plugins: {legend: {display: false}},
       scales: {x: {beginAtZero: true, ticks: {precision: 0}}},
+      onClick: onSelect ? (_event, elements) => {
+        const index = elements[0]?.index;
+        if (index !== undefined) onSelect(top[index]);
+      } : undefined,
     },
   });
 }
 
-function renderMapperChart(entries) {
-  charts['mapper-chart']?.destroy();
+function renderMapperChart(entries, id = 'mapper-chart') {
+  charts[id]?.destroy();
   const top = entries.slice(0, 10);
-  charts['mapper-chart'] = new Chart(document.querySelector('#mapper-chart'), {
+  charts[id] = new Chart(document.querySelector(`#${id}`), {
     type: 'bar',
     data: {
       labels: top.map(entry => entry.row.editorName || '不明'),
@@ -262,6 +335,93 @@ function renderMapperChart(entries) {
       },
     },
   });
+}
+
+function mapperEntries(rows) {
+  return rows.map(row => ({
+    key: row.uid || row.name,
+    count: Number(row.count) || 0,
+    creates: Number(row.creates) || 0,
+    modifies: Number(row.modifies) || 0,
+    row: {editorName: row.name, editorUid: row.uid},
+  }));
+}
+
+function mapperTableRows(entries, total) {
+  return entries.map((entry, index) => {
+    const name = entry.row.editorName || '不明';
+    const label = entry.row.editorUid ? `${name} (${entry.row.editorUid})` : name;
+    const linked = name === '不明' ? escapeHtml(label) : `<a href="https://www.openstreetmap.org/user/${encodeURIComponent(name)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.creates)}</td><td>${number(entry.modifies)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
+  }).join('');
+}
+
+function categoryTableRows(entries, total) {
+  return entries.map((entry, index) =>
+    `<tr><td>${index + 1}</td><td>${escapeHtml(categoryName(entry.row))}<br><small>${escapeHtml(entry.key)}</small></td><td><button class="category-mapper-button" type="button" data-category-index="${index}">マッパーを見る</button></td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
+}
+
+function filterRankingRows(input) {
+  const tableBody = document.querySelector(`#${input.dataset.filterTarget}`);
+  if (!tableBody) return;
+  const query = input.value.normalize('NFKC').toLocaleLowerCase('ja');
+  tableBody.querySelectorAll('tr').forEach(row => {
+    row.hidden = Boolean(query) && !row.textContent.normalize('NFKC').toLocaleLowerCase('ja').includes(query);
+  });
+}
+
+function applyRankingFilters() {
+  document.querySelectorAll('.ranking-filter').forEach(filterRankingRows);
+}
+
+function resetCategoryMapperRanking() {
+  categoryMapperRequest++;
+  clearCsvList('category-mappers');
+  document.querySelector('#category-mapper-ranking').hidden = true;
+  document.querySelector('#category-mapper-table').innerHTML = '';
+  document.querySelector('[data-filter-target="category-mapper-table"]').value = '';
+  charts['category-mapper-chart']?.destroy();
+  delete charts['category-mapper-chart'];
+}
+
+async function loadCategoryMapperRanking(entry) {
+  const request = ++categoryMapperRequest;
+  const panel = document.querySelector('#category-mapper-ranking');
+  const status = document.querySelector('#category-mapper-status');
+  panel.hidden = false;
+  document.querySelector('#category-mapper-title').textContent = `${categoryName(entry.row)}のマッパーランキング`;
+  document.querySelector('#category-mapper-key').textContent = entry.key;
+  document.querySelector('#category-mapper-table').innerHTML = '';
+  charts['category-mapper-chart']?.destroy();
+  delete charts['category-mapper-chart'];
+  status.textContent = '集計中…';
+  panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+  try {
+    const query = new URLSearchParams({
+      from: fromElement.value,
+      to: toElement.value,
+      category: entry.row.type,
+      category_value: entry.row.value,
+    });
+    const prefecture = selectedPrefectureName();
+    if (prefecture) query.set('prefecture', prefecture);
+    const facetsQuery = new URLSearchParams(query);
+    facetsQuery.set('mode', 'facets');
+    const data = await fetchJson(`${apiUrl}?${facetsQuery}`);
+    await fillMapperActionCounts(data, query);
+    if (request !== categoryMapperRequest) return;
+
+    const mappers = mapperEntries(data.mappers || []);
+    renderMapperChart(mappers, 'category-mapper-chart');
+    document.querySelector('#category-mapper-table').innerHTML = mapperTableRows(mappers, entry.count);
+    setCsvList('category-mappers', mapperCsvRows(mappers, entry.count));
+    filterRankingRows(document.querySelector('[data-filter-target="category-mapper-table"]'));
+    status.textContent = mappers.length ? `${number(mappers.length)}人（合計件数の上位100名）` : '該当するマッパーはいません。';
+  } catch (error) {
+    if (request !== categoryMapperRequest) return;
+    status.textContent = `取得できませんでした: ${error.message}`;
+  }
 }
 
 function buildDailyRows(rows) {
@@ -304,10 +464,8 @@ function renderDailyChart(dailyRows) {
 }
 
 function render(rows) {
-  currentNationwideData = null;
   document.querySelector('#prefecture-ranking').hidden = true;
   document.querySelector('#changeset-ranking').hidden = false;
-  currentReportRows = rows;
   const total = rows.length;
   const creates = rows.filter(row => row.action === 'create').length;
   const mapperRows = countMappers(rows);
@@ -317,29 +475,44 @@ function render(rows) {
   document.querySelector('#changesets').textContent = `${number(changesets.length)}件`;
 
   const categories = countBy(rows, row => `${row.type}=${row.value}`);
-  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数');
-  document.querySelector('#category-table').innerHTML = categories.slice(0, 100).map((entry, index) =>
-    `<tr><td>${index + 1}</td><td>${escapeHtml(categoryName(entry.row))}<br><small>${escapeHtml(entry.key)}</small></td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
+  currentCategoryEntries = categories.slice(0, 100);
+  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数', loadCategoryMapperRanking);
+  document.querySelector('#category-table').innerHTML = categoryTableRows(currentCategoryEntries, total);
+  setCsvList('categories', [
+    ['順位', '代表タグ', 'タグ', '件数', '割合'],
+    ...currentCategoryEntries.map((entry, index) => [
+      index + 1, categoryName(entry.row), entry.key, entry.count, percent(entry.count, total),
+    ]),
+  ]);
 
-  document.querySelector('#mapper-table').innerHTML = mapperRows.slice(0, 100).map((entry, index) => {
-    const name = entry.row.editorName || '不明';
-    const label = entry.row.editorUid ? `${name} (${entry.row.editorUid})` : name;
-    const linked = name === '不明' ? escapeHtml(label) : `<a href="https://www.openstreetmap.org/user/${encodeURIComponent(name)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
-    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.creates)}</td><td>${number(entry.modifies)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
-  }).join('');
+  const displayedMappers = mapperRows.slice(0, 100);
+  document.querySelector('#mapper-table').innerHTML = mapperTableRows(displayedMappers, total);
   renderMapperChart(mapperRows);
+  setCsvList('mappers', mapperCsvRows(displayedMappers, total));
 
   const dailyRows = buildDailyRows(rows);
   renderDailyChart(dailyRows);
   document.querySelector('#daily-table').innerHTML = dailyRows.map(row =>
     `<tr><td>${escapeHtml(row.date.replace(/-/g, '/'))}</td><td>${number(row.create)}</td><td>${number(row.modify)}</td><td>${number(row.create + row.modify)}</td></tr>`).join('');
+  setCsvList('daily', [
+    ['日付', '新規', '更新', '合計'],
+    ...dailyRows.map(row => [row.date, row.create, row.modify, row.create + row.modify]),
+  ]);
 
 
   renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数');
-  document.querySelector('#changeset-table').innerHTML = changesets.slice(0, 100).map((entry, index) => {
+  const displayedChangesets = changesets.slice(0, 100);
+  document.querySelector('#changeset-table').innerHTML = displayedChangesets.map((entry, index) => {
     const editor = entry.row.editorName || '不明';
     return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
   }).join('');
+  setCsvList('changesets', [
+    ['順位', '変更セット', 'マッパー', '件数'],
+    ...displayedChangesets.map((entry, index) => [
+      index + 1, entry.key, entry.row.editorName || '不明', entry.count,
+    ]),
+  ]);
+  applyRankingFilters();
 }
 
 function buildAggregateDailyRows(rows) {
@@ -360,8 +533,6 @@ function buildAggregateDailyRows(rows) {
 }
 
 function renderNationwide(data) {
-  currentReportRows = [];
-  currentNationwideData = data;
   document.querySelector('#prefecture-ranking').hidden = false;
   document.querySelector('#changeset-ranking').hidden = false;
 
@@ -379,40 +550,54 @@ function renderNationwide(data) {
   renderHorizontalChart('prefecture-chart', prefectures, entry => entry.row.name, '更新地物数');
   document.querySelector('#prefecture-table').innerHTML = prefectures.map((entry, index) =>
     `<tr><td>${index + 1}</td><td>${escapeHtml(entry.row.name)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
+  setCsvList('prefectures', [
+    ['順位', '都道府県', '件数', '割合'],
+    ...prefectures.map((entry, index) => [
+      index + 1, entry.row.name, entry.count, percent(entry.count, total),
+    ]),
+  ]);
 
   const categories = (data.categories || []).map(row => ({key: `${row.type}=${row.value}`, count: Number(row.count) || 0, row}));
-  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数');
-  document.querySelector('#category-table').innerHTML = categories.map((entry, index) =>
-    `<tr><td>${index + 1}</td><td>${escapeHtml(categoryName(entry.row))}<br><small>${escapeHtml(entry.key)}</small></td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
+  currentCategoryEntries = categories;
+  renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数', loadCategoryMapperRanking);
+  document.querySelector('#category-table').innerHTML = categoryTableRows(currentCategoryEntries, total);
+  setCsvList('categories', [
+    ['順位', '代表タグ', 'タグ', '件数', '割合'],
+    ...categories.map((entry, index) => [
+      index + 1, categoryName(entry.row), entry.key, entry.count, percent(entry.count, total),
+    ]),
+  ]);
 
-  const mappers = (data.mappers || []).map(row => ({
-    key: row.uid || row.name,
-    count: Number(row.count) || 0,
-    creates: Number(row.creates) || 0,
-    modifies: Number(row.modifies) || 0,
-    row: {editorName: row.name, editorUid: row.uid},
-  }));
+  const mappers = mapperEntries(data.mappers || []);
   renderMapperChart(mappers);
-  document.querySelector('#mapper-table').innerHTML = mappers.map((entry, index) => {
-    const name = entry.row.editorName || '不明';
-    const label = entry.row.editorUid ? `${name} (${entry.row.editorUid})` : name;
-    const linked = name === '不明' ? escapeHtml(label) : `<a href="https://www.openstreetmap.org/user/${encodeURIComponent(name)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
-    return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.creates)}</td><td>${number(entry.modifies)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
-  }).join('');
+  document.querySelector('#mapper-table').innerHTML = mapperTableRows(mappers, total);
+  setCsvList('mappers', mapperCsvRows(mappers, total));
 
   renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数');
   document.querySelector('#changeset-table').innerHTML = changesets.map((entry, index) => {
     const editor = entry.row.editorName || '不明';
     return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
   }).join('');
+  setCsvList('changesets', [
+    ['順位', '変更セット', 'マッパー', '件数'],
+    ...changesets.map((entry, index) => [
+      index + 1, entry.key, entry.row.editorName || '不明', entry.count,
+    ]),
+  ]);
 
   renderDailyChart(dailyRows);
   document.querySelector('#daily-table').innerHTML = dailyRows.map(row =>
     `<tr><td>${escapeHtml(row.date.replace(/-/g, '/'))}</td><td>${number(row.create)}</td><td>${number(row.modify)}</td><td>${number(row.create + row.modify)}</td></tr>`).join('');
+  setCsvList('daily', [
+    ['日付', '新規', '更新', '合計'],
+    ...dailyRows.map(row => [row.date, row.create, row.modify, row.create + row.modify]),
+  ]);
+  applyRankingFilters();
 }
 async function loadReport() {
   statusElement.textContent = '集計中…';
-  document.querySelector('#prefecture-csv').hidden = true;
+  resetCsvLists();
+  resetCategoryMapperRanking();
   try {
     if (!fromElement.value || !toElement.value || fromElement.value > toElement.value) {
       throw new Error('集計条件を正しく選択してください。');
@@ -428,8 +613,9 @@ async function loadReport() {
     nationwideQuery.set('mode', 'japan');
     const reportRequest = name
       ? fetchAllPois(query)
-      : fetchJson(`api.php?${nationwideQuery}`);
+      : fetchJson(`${apiUrl}?${nationwideQuery}`);
     const [data, prefectureCounts] = await Promise.all([reportRequest, loadPrefectureCounts()]);
+    if (!name) await fillMapperActionCounts(data, query);
     renderPrefectureColors(prefectureCounts);
 
     if (name) {
@@ -441,7 +627,6 @@ async function loadReport() {
     }
     statusElement.textContent = '';
     document.querySelector('#period').textContent = `集計期間：${formatJstDateTime(data.meta.periodStart)} ～ ${formatJstDateTime(data.meta.periodEnd)}`;
-    document.querySelector('#prefecture-csv').hidden = false;
     updateMapSelection();
   } catch (error) {
     statusElement.textContent = `取得できませんでした: ${error.message}`;
@@ -460,7 +645,15 @@ function applyPresetDates() {
 
 async function initialize() {
   applyPresetDates();
-  const [geojson, categories] = await Promise.all([fetchJson('data/prefectures.min.geojson'), fetchJsonc('data/category-ja.jsonc')]);
+  const [configuration, geojson, categories] = await Promise.all([
+    fetchJsonc('data/config.jsonc'),
+    fetchJson('data/prefectures.min.geojson'),
+    fetchJsonc('data/category-ja.jsonc'),
+  ]);
+  apiUrl = String(configuration.apiUrl || '').trim();
+  if (!/^https?:\/\//.test(apiUrl)) {
+    throw new Error('data/config.jsonc の apiUrl に絶対URLを指定してください。');
+  }
   prefectureFeatures = geojson.features.sort((a, b) => prefectureName(a).localeCompare(prefectureName(b), 'ja'));
   categoryRules = categories.category || {};
 
@@ -485,29 +678,22 @@ toElement.addEventListener('change', () => {
   loadReport();
 });
 document.querySelector('#filter').addEventListener('submit', event => { event.preventDefault(); loadReport(); });
-document.querySelector('#prefecture-csv').addEventListener('click', event => {
-  event.preventDefault();
-  const output = [['区分', '順位・日付', '名称', '補足', '件数', '割合']];
-  if (currentNationwideData) {
-    const total = Number(currentNationwideData.total) || 0;
-    (currentNationwideData.prefectures || []).forEach((row, index) => output.push(['都道府県', index + 1, row.name, '', row.count, percent(row.count, total)]));
-    (currentNationwideData.categories || []).forEach((row, index) => output.push(['代表タグ', index + 1, categoryName(row), `${row.type}=${row.value}`, row.count, percent(row.count, total)]));
-    (currentNationwideData.mappers || []).forEach((row, index) => output.push(['マッパー', index + 1, row.name, `${row.uid || ''} / 新規${row.creates}件・更新${row.modifies}件`, row.count, percent(row.count, total)]));
-    (currentNationwideData.changesets || []).forEach((row, index) => output.push(['変更セット', index + 1, row.changeset, row.editorName || '不明', row.count, percent(row.count, total)]));
-    buildAggregateDailyRows(currentNationwideData.daily || []).forEach(row => output.push(['日別更新', row.date, '', `新規${row.create}件・更新${row.modify}件`, row.create + row.modify, percent(row.create + row.modify, total)]));
-    downloadCsv(`osm-japan_${fromElement.value}_${toElement.value}.csv`, output);
-    return;
-  }
-
-  const total = currentReportRows.length;
-  countBy(currentReportRows, row => `${row.type}=${row.value}`).forEach((entry, index) => output.push(['代表タグ', index + 1, categoryName(entry.row), entry.key, entry.count, percent(entry.count, total)]));
-  countMappers(currentReportRows).forEach((entry, index) => output.push(['マッパー', index + 1, entry.row.editorName || '不明', `${entry.row.editorUid || ''} / 新規${entry.creates}件・更新${entry.modifies}件`, entry.count, percent(entry.count, total)]));
-  buildDailyRows(currentReportRows).forEach(entry => {
-    const count = entry.create + entry.modify;
-    output.push(['日別更新', entry.date, '', `新規${entry.create}件・更新${entry.modify}件`, count, percent(count, total)]);
+document.querySelectorAll('.ranking-filter').forEach(input => {
+  input.addEventListener('input', () => filterRankingRows(input));
+});
+document.querySelector('#category-table').addEventListener('click', event => {
+  const button = event.target.closest('[data-category-index]');
+  if (!button) return;
+  const entry = currentCategoryEntries[Number(button.dataset.categoryIndex)];
+  if (entry) loadCategoryMapperRanking(entry);
+});
+document.querySelector('#category-mapper-close').addEventListener('click', resetCategoryMapperRanking);
+document.querySelectorAll('[data-csv-list]').forEach(button => {
+  button.addEventListener('click', () => {
+    const key = button.dataset.csvList;
+    const rows = csvLists[key];
+    if (!rows || rows.length <= 1) return;
+    downloadCsv(`osm-${csvFileScope()}-${key}_${fromElement.value}_${toElement.value}.csv`, rows);
   });
-  countBy(currentReportRows.filter(row => row.changeset), row => row.changeset).forEach((entry, index) => output.push(['変更セット', index + 1, entry.key, entry.row.editorName || '不明', entry.count, percent(entry.count, total)]));
-  const safeName = selectedPrefectureName().replace(/[\/:*?"<>|]/g, '_');
-  downloadCsv(`osm-${safeName}_${fromElement.value}_${toElement.value}.csv`, output);
 });
 initialize().catch(error => { statusElement.textContent = `取得できませんでした: ${error.message}`; });

@@ -28,13 +28,14 @@
         </ul>
         <p class="map-guide-note"><strong>時刻について</strong>OSMへの登録・更新時刻を示すもので、施設の開業日や現実世界での変更日を示すものではありません。</p>
         <p class="map-guide-scope">タグ付きノードに加え、対象タグを持つwayとmultipolygon relationを対象としています。</p>
-        <section class="map-guide-about" aria-label="APIとライセンス">
+        <section class="map-guide-about" aria-label="運営情報、APIとライセンス">
           <p class="map-guide-about-description">地物を取得するAPIの使い方、利用できるクエリパラメーター、セットアップ方法、ソースコードをGitHubで公開しています。</p>
           <a class="site-info-repository map-guide-repository" href="https://github.com/K-Sakanoshita/osm-whatsnew-japan" target="_blank" rel="noopener noreferrer">
             <span>GitHubでAPIの使い方とソースコードを見る</span>
             <small>K-Sakanoshita/osm-whatsnew-japan ↗</small>
           </a>
           <p class="map-guide-license">OpenStreetMapのデータはOpen Database License（ODbL）の下で提供されています。利用時は© OpenStreetMap contributorsの表示が必要です。</p>
+          <p class="map-guide-operator"><strong>制作・運営：坂ノ下 勝幸</strong><br>本サイトは個人が開発・運営しています。OpenStreetMap FoundationおよびOpenStreetMap Foundation Japanの公式サービスではありません。</p>
         </section>
       </div>
       <div class="map-guide-actions"><button class="map-guide-start" type="button">地図を見る</button></div>

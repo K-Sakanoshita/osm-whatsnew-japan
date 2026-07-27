@@ -1,0 +1,4 @@
+{
+  // 更新データを取得するAPIの絶対URL
+  "apiUrl": "https://armd-01.sakura.ne.jp/whatsnew/api.php"
+}
