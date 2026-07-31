@@ -184,16 +184,23 @@ function updateMapSelection() {
 }
 
 function initializePrefectureMap(geojson) {
+  const initialMapView = window.osmSharedMapView.read({
+    fallbackCenter: [137.2, 36.2],
+    fallbackZoom: 4.15,
+    minZoom: 0,
+    maxZoom: 7,
+  });
   prefectureMap = new maplibregl.Map({
     container: 'prefecture-map',
-    center: [137.2, 36.2],
-    zoom: 4.15,
+    center: initialMapView.center,
+    zoom: initialMapView.zoom,
     maxZoom: 7,
     maxBounds: [[118, 18], [158, 50]],
     fadeDuration: 0,
     style: './tiles/osmfj_nopoi.json',
   });
   prefectureMap.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+  window.osmSharedMapView.bind(prefectureMap);
   prefectureMap.on('load', () => {
     prefectureMap.addSource('prefecture-boundaries', {type: 'geojson', data: geojson});
     const firstSymbolLayer = prefectureMap.getStyle().layers.find(layer => layer.type === 'symbol')?.id;
@@ -237,8 +244,9 @@ function countBy(rows, keyBuilder) {
   const counts = new Map();
   rows.forEach(row => {
     const key = keyBuilder(row);
-    const current = counts.get(key) || {key, count: 0, row};
+    const current = counts.get(key) || {key, count: 0, creates: 0, modifies: 0, row};
     current.count++;
+    current[row.action === 'create' ? 'creates' : 'modifies']++;
     counts.set(key, current);
   });
   return [...counts.values()].sort((a, b) => b.count - a.count || String(a.key).localeCompare(String(b.key), 'ja'));
@@ -291,19 +299,30 @@ function categoryName(row) {
 function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect) {
   charts[id]?.destroy();
   const top = entries.slice(0, 10);
+  const hasActionBreakdown = top.some(entry =>
+    entry.creates !== undefined && entry.modifies !== undefined);
+  const datasets = hasActionBreakdown
+    ? [
+      {label: '新規', data: top.map(entry => entry.creates), backgroundColor: CREATE_COLOR},
+      {label: '更新', data: top.map(entry => entry.modifies), backgroundColor: MODIFY_COLOR},
+    ]
+    : [{label: datasetLabel, data: top.map(entry => entry.count), backgroundColor: '#1b8d70'}];
   charts[id] = new Chart(document.querySelector(`#${id}`), {
     type: 'bar',
     data: {
       labels: top.map(labelBuilder),
-      datasets: [{label: datasetLabel, data: top.map(entry => entry.count), backgroundColor: '#1b8d70'}],
+      datasets,
     },
     options: {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      plugins: {legend: {display: false}},
-      scales: {x: {beginAtZero: true, ticks: {precision: 0}}},
+      plugins: {legend: {display: hasActionBreakdown}},
+      scales: {
+        x: {stacked: hasActionBreakdown, beginAtZero: true, ticks: {precision: 0}},
+        y: {stacked: hasActionBreakdown},
+      },
       onClick: onSelect ? (_event, elements) => {
         const index = elements[0]?.index;
         if (index !== undefined) onSelect(top[index]);
@@ -541,12 +560,24 @@ function renderNationwide(data) {
   const creates = dailyRows.reduce((sum, row) => sum + row.create, 0);
   const modifies = dailyRows.reduce((sum, row) => sum + row.modify, 0);
   const mapperCount = Number(data.mapperCount) || 0;
-  const changesets = (data.changesets || []).map(row => ({key: row.changeset, count: Number(row.count) || 0, row: {editorName: row.editorName}}));
+  const changesets = (data.changesets || []).map(row => ({
+    key: row.changeset,
+    count: Number(row.count) || 0,
+    creates: row.creates === undefined ? undefined : Number(row.creates) || 0,
+    modifies: row.modifies === undefined ? undefined : Number(row.modifies) || 0,
+    row: {editorName: row.editorName},
+  }));
   updateTotalSummary(total, creates, modifies);
   document.querySelector('#mappers').textContent = `${number(mapperCount)}人`;
   document.querySelector('#changesets').textContent = `${number(Number(data.changesetCount) || 0)}件`;
 
-  const prefectures = (data.prefectures || []).map(row => ({key: row.name, count: Number(row.count) || 0, row}));
+  const prefectures = (data.prefectures || []).map(row => ({
+    key: row.name,
+    count: Number(row.count) || 0,
+    creates: row.creates === undefined ? undefined : Number(row.creates) || 0,
+    modifies: row.modifies === undefined ? undefined : Number(row.modifies) || 0,
+    row,
+  }));
   renderHorizontalChart('prefecture-chart', prefectures, entry => entry.row.name, '更新地物数');
   document.querySelector('#prefecture-table').innerHTML = prefectures.map((entry, index) =>
     `<tr><td>${index + 1}</td><td>${escapeHtml(entry.row.name)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
@@ -557,7 +588,13 @@ function renderNationwide(data) {
     ]),
   ]);
 
-  const categories = (data.categories || []).map(row => ({key: `${row.type}=${row.value}`, count: Number(row.count) || 0, row}));
+  const categories = (data.categories || []).map(row => ({
+    key: `${row.type}=${row.value}`,
+    count: Number(row.count) || 0,
+    creates: row.creates === undefined ? undefined : Number(row.creates) || 0,
+    modifies: row.modifies === undefined ? undefined : Number(row.modifies) || 0,
+    row,
+  }));
   currentCategoryEntries = categories;
   renderHorizontalChart('category-chart', categories, entry => categoryName(entry.row), '更新地物数', loadCategoryMapperRanking);
   document.querySelector('#category-table').innerHTML = categoryTableRows(currentCategoryEntries, total);

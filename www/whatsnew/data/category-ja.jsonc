@@ -6,6 +6,7 @@
             "*": "-"
         },
         "advertising": {
+            "billboard": "広告看板",
             "board": "広告板",
             "sign": "広告看板"
         },
@@ -40,6 +41,7 @@
             "college": "専門学校/短大/大学",
             "community_centre": "コミュニティセンター・スペース",
             "compressed_air": "空気入れ",
+            "co-working": "コワーキングスペース",
             "courthouse": "裁判所",
             "coworking_space": "コワーキングスペース",
             "crematorium": "火葬場",
@@ -77,6 +79,7 @@
             "marketplace": "市場",
             "mist_spraying_cooler": "ミスト噴霧冷却設備",
             "motorcycle_parking": "バイク駐車場",
+            "motorcycle_rental": "レンタルバイク",
             "music_school": "音楽教室",
             "parking": "駐車場",
             "parking_entrance": "駐車場入口",
@@ -96,6 +99,7 @@
             "public_bookcase": "街角文庫",
             "ranger_station": "自然保護官事務所",
             "recycling": "リサイクル",
+            "research_institute": "研究機関",
             "restaurant": "レストラン",
             "sanitary_dump_station": "廃棄物処理",
             "school": "学校",
@@ -171,6 +175,9 @@
             "roof": "屋根",
             "yes": "建物"
         },
+        "cemetery": {
+            "sector": "墓地区画"
+        },
         "craft": {
             "brewery": "醸造所",
             "carpenter": "工務店",
@@ -186,6 +193,7 @@
             "painter": "塗装業",
             "pottery": "陶芸工房",
             "distillery": "蒸留所",
+            "electrician": "電気工事業者",
             "tailor": "仕立て屋",
             "shoemaker": "靴職人",
             "carpet_layer": "カーペット施工業",
@@ -213,6 +221,7 @@
             "fire_lookout": "火の見櫓",
             "defibrillator": "AED",
             "siren": "サイレン",
+            "suction_point": "消防水利",
             "water_tank": "防火水槽"
         },
         "entrance": {
@@ -279,6 +288,7 @@
             "it": "IT企業",
             "lawyer": "法律事務所",
             "logistics": "物流会社",
+            "moving_company": "引越業者",
             "newspaper": "新聞社",
             "ngo": "NGO事務所",
             "notary": "公証人事務所",
@@ -329,18 +339,21 @@
             "convenience": "コンビニエンスストア",
             "copyshop": "コピー店",
             "cosmetics": "化粧品店",
+            "curtain": "カーテン店",
             "dairy": "乳製品店",
             "deli": "お弁当/惣菜屋",
             "department_store": "百貨店",
             "doityourself": "ホームセンター",
             "dry_cleaning": "クリーニング店",
             "electronics": "家電販売屋",
+            "erotic": "アダルトショップ",
             "farm": "農場直売店",
             "florist": "花屋",
             "fishing": "釣具店",
             "frozen_food": "冷凍食品専門店",
             "funeral_directors": "葬儀社",
             "furniture": "家具屋",
+            "games": "ゲーム用品店",
             "garden_centre": "園芸用品店",
             "general": "雑貨店",
             "gift": "おみやげ屋",
@@ -354,15 +367,18 @@
             "interior_decoration": "内装用品",
             "jewelry": "宝飾店",
             "kiosk": "キオスク",
+            "kitchen": "キッチン用品店",
             "laundry": "ランドリー",
             "mall": "ショッピングモール",
             "massage": "マッサージ店",
             "medical_supply": "医療用品店",
             "mobile_phone": "携帯電話/関連店",
+            "model": "模型店",
             "motorcycle": "自転車屋",
             "newsagent": "新聞販売店",
             "optician": "メガネ店",
             "outdoor": "アウトドア用品店",
+            "outpost": "オンライン注文受取店",
             "pasta": "パスタ専門店",
             "pastry": "お菓子店(焼き菓子)",
             "pawnbroker": "質屋",
@@ -431,9 +447,11 @@
         },
         "natural": {
             "beach": "砂浜・海岸",
+            "cape": "岬",
             "cave_entrance": "洞窟入口",
             "cliff": "崖",
             "grassland": "草原",
+            "hot_spring": "温泉",
             "peak": "頂上",
             "rock": "岩",
             "saddle": "鞍部",
@@ -457,11 +475,13 @@
             "bus_stop": "バス停",
             "crossing": "横断歩道・道路横断箇所",
             "emergency_access_point": "緊急位置標識",
+            "traffic_mirror": "カーブミラー",
             "traffic_signals": "信号機",
                 "give_way": "ゆずれ標識",
             "mini_roundabout": "ミニラウンドアバウト",
             "milestone": "距離標",
             "motorway_junction": "高速道路出入口",
+            "passing_place": "待避所",
             "rest_area": "休憩所",
             "services": "道路サービスエリア",
             "speed_camera": "速度取締カメラ",
@@ -473,6 +493,9 @@
         },
         "social_facility": {
             "shelter": "一時避難所"
+        },
+        "sport": {
+            "climbing": "クライミング"
         },
         "playground": {
             "activitypanel": "パネル遊具",
@@ -606,7 +629,9 @@
             "obelisk": "オベリスク",
             "petroleum_well": "油井",
             "pier": "桟橋",
+            "planter": "プランター",
             "pumping_station": "ポンプ場",
+            "sign": "看板",
             "silo": "サイロ",
             "storage_tank": "貯蔵タンク",
             "telescope": "望遠鏡",
@@ -623,6 +648,9 @@
             "watermill": "水車小屋",
             "windmill": "風車小屋",
             "works": "工場"
+        },
+        "junction": {
+            "yes": "交差点"
         },
         "landuse": {
             "farmland": "農地",
@@ -697,6 +725,7 @@
             "island": "島",
             "islet": "小島",
             "locality": "区画",
+            "sea": "海域",
             "square": "広場",
             "suburb": "区",
             "quarter": "大字",
@@ -708,6 +737,7 @@
             "aerodrome": "飛行場",
             "gate": "搭乗口",
             "helipad": "ヘリポート",
+            "launchpad": "発射台",
             "terminal": "空港ターミナル",
             "windsock": "吹流し"
         },

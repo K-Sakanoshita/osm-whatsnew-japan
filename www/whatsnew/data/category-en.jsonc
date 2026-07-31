@@ -6,6 +6,7 @@
             "*": "-"
         },
         "advertising": {
+            "billboard": "billboard",
             "board": "advertising board",
             "sign": "advertising sign"
         },
@@ -40,6 +41,7 @@
             "college": "college",
             "community_centre": "community center",
             "compressed_air": "compressed air",
+            "co-working": "coworking space",
             "courthouse": "courthouse",
             "coworking_space": "coworking space",
             "crematorium": "crematorium",
@@ -77,6 +79,7 @@
             "marketplace": "marketplace",
             "mist_spraying_cooler": "mist spraying cooler",
             "motorcycle_parking": "motorcycle parking",
+            "motorcycle_rental": "motorcycle rental",
             "music_school": "music school",
             "parking": "parking",
             "parking_entrance": "parking entrance",
@@ -96,6 +99,7 @@
             "public_bookcase": "public bookcase",
             "ranger_station": "ranger station",
             "recycling": "recycling",
+            "research_institute": "research institute",
             "restaurant": "restaurant",
             "sanitary_dump_station": "sanitary dump station",
             "school": "school",
@@ -171,6 +175,9 @@
             "roof": "roof",
             "yes": "building"
         },
+        "cemetery": {
+            "sector": "cemetery sector"
+        },
         "craft": {
             "brewery": "brewery",
             "carpenter": "carpenter",
@@ -186,6 +193,7 @@
             "painter": "painter",
             "pottery": "pottery",
             "distillery": "distillery",
+            "electrician": "electrician",
             "tailor": "tailor",
             "shoemaker": "shoemaker",
             "carpet_layer": "carpet layer",
@@ -213,6 +221,7 @@
             "fire_lookout": "fire lookout",
             "defibrillator": "AED",
             "siren": "siren",
+            "suction_point": "suction point",
             "water_tank": "Water Tank"
         },
         "healthcare": {
@@ -279,6 +288,7 @@
             "it": "IT company",
             "lawyer": "law office",
             "logistics": "logistics office",
+            "moving_company": "moving company",
             "newspaper": "newspaper office",
             "ngo": "NGO office",
             "notary": "notary office",
@@ -329,18 +339,21 @@
             "convenience": "convenience",
             "copyshop": "copy shop",
             "cosmetics": "cosmetics",
+            "curtain": "curtain shop",
             "dairy": "dairy",
             "deli": "deli",
             "department_store": "department store",
             "doityourself": "doityourself",
             "dry_cleaning": "dry cleaning",
             "electronics": "electronic",
+            "erotic": "erotic shop",
             "farm": "farm",
             "florist": "florist",
             "fishing": "fishing tackle shop",
             "frozen_food": "frozen food",
             "funeral_directors": "cemetery",
             "furniture": "furniture",
+            "games": "games shop",
             "garden_centre": "garden center",
             "general": "general",
             "gift": "gift",
@@ -354,15 +367,18 @@
             "interior_decoration": "interior decoration",
             "jewelry": "jewelry store",
             "kiosk": "kiosk",
+            "kitchen": "kitchen shop",
             "laundry": "laundry",
             "mall": "shopping mall",
             "massage": "massage",
             "medical_supply": "medical supply",
             "mobile_phone": "mobile phone",
+            "model": "model shop",
             "motorcycle": "motorcycle",
             "newsagent": "newsagent",
             "optician": "optician",
             "outdoor": "outdoor shop",
+            "outpost": "online order pickup shop",
             "pasta": "pasta",
             "pastry": "pastry",
             "pawnbroker": "pawnbroker",
@@ -431,9 +447,11 @@
         },
         "natural": {
             "beach": "beach",
+            "cape": "cape",
             "cave_entrance": "cave entrance",
             "cliff": "cliff",
             "grassland": "grassland",
+            "hot_spring": "hot spring",
             "peak": "peak",
             "rock": "rock",
             "saddle": "saddle",
@@ -457,11 +475,13 @@
             "bus_stop": "bus stop",
             "crossing": "street crossing",
             "emergency_access_point": "emergency access point",
+            "traffic_mirror": "traffic mirror",
             "traffic_signals": "traffic signals",
             "give_way": "give way sign",
             "mini_roundabout": "mini roundabout",
             "milestone": "milestone",
             "motorway_junction": "motorway junction",
+            "passing_place": "passing place",
             "rest_area": "rest area",
             "services": "motorway service area",
             "speed_camera": "speed camera",
@@ -473,6 +493,9 @@
         },
         "social_facility": {
             "shelter": "temporary shelter"
+        },
+        "sport": {
+            "climbing": "climbing"
         },
         "playground": {
             "activitypanel": "activitypanel",
@@ -606,7 +629,9 @@
             "obelisk": "obelisk",
             "petroleum_well": "petroleum well",
             "pier": "pier",
+            "planter": "planter",
             "pumping_station": "pumping station",
+            "sign": "sign",
             "silo": "silo",
             "storage_tank": "storage tank",
             "telescope": "telescope",
@@ -623,6 +648,9 @@
             "watermill": "watermill",
             "windmill": "windmill",
             "works": "works"
+        },
+        "junction": {
+            "yes": "junction"
         },
         "landuse": {
             "farmland": "farmland",
@@ -697,6 +725,7 @@
             "island": "island",
             "islet": "islet",
             "locality": "locality",
+            "sea": "sea",
             "square": "square",
             "suburb": "suburb",
             "quarter": "quarter",
@@ -708,6 +737,7 @@
             "aerodrome": "aerodrome",
             "gate": "airport gate",
             "helipad": "helipad",
+            "launchpad": "launchpad",
             "terminal": "airport terminal",
             "windsock": "windsock"
         },

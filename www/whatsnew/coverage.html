@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>地物密度マップ | OSM What’s New Japan</title>
+  <meta name="description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
+  <meta name="theme-color" content="#12634f">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css?v=20260731-8">
+  <style>
+    html,
+    .coverage-page {
+      width: 100%;
+      height: 100%;
+    }
+
+    .coverage-page {
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .coverage-page header {
+      z-index: 2;
+    }
+
+    .coverage-page main {
+      position: relative;
+      min-height: 0;
+    }
+
+    .coverage-page #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    .coverage-page .panel {
+      position: absolute;
+      z-index: 1;
+      top: 12px;
+      left: 12px;
+      width: min(360px, calc(100% - 24px));
+      padding: 14px;
+      border: 1px solid #d7dfdb;
+      border-radius: 10px;
+      background: rgb(255 255 255 / 94%);
+      box-shadow: 0 3px 14px rgb(0 0 0 / 18%);
+      backdrop-filter: blur(4px);
+    }
+
+    .coverage-page .panel h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+
+    .coverage-page .panel p {
+      margin: 5px 0;
+      font-size: .82rem;
+      line-height: 1.5;
+    }
+
+    .coverage-page .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 10px 0;
+    }
+
+    .coverage-page .controls label {
+      flex: 0 0 auto;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+
+    .coverage-page .controls select {
+      min-height: 36px;
+      min-width: 0;
+      flex: 1;
+      padding: 5px 8px;
+      border: 1px solid #a8b8b1;
+      border-radius: 6px;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+    }
+
+    .coverage-page .legend {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 3px;
+      margin-top: 8px;
+      font-size: .7rem;
+      text-align: center;
+    }
+
+    .coverage-page .legend span::before {
+      display: block;
+      height: 8px;
+      margin-bottom: 2px;
+      border-radius: 2px;
+      background: var(--color);
+      content: "";
+    }
+
+    .coverage-page #status {
+      min-height: 1.5em;
+      color: #37463f;
+    }
+
+    .coverage-page .notice {
+      color: #6b3f00;
+    }
+
+    .coverage-page .maplibregl-popup-content {
+      padding: 10px 12px;
+      font-size: .82rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 700px) {
+      .coverage-page header {
+        min-height: 62px;
+        height: auto;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 5px 12px;
+        padding: 5px 10px;
+      }
+
+      .coverage-page header .site-logo {
+        width: 32px;
+        height: 32px;
+        flex-basis: 32px;
+      }
+
+      .coverage-page header > div {
+        min-width: 0;
+        margin: 0;
+      }
+
+      .coverage-page header h1 {
+        overflow: hidden;
+        font-size: 18px;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .coverage-page header .site-info-trigger {
+        max-width: 100%;
+      }
+
+      .coverage-page header .site-info-trigger span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .coverage-page header small {
+        margin-top: 2px;
+        font-size: 10px;
+        line-height: 1.3;
+      }
+
+      .coverage-page header nav {
+        justify-self: end;
+      }
+
+      .coverage-page header nav .header-view-tab {
+        min-height: 36px;
+        padding: 7px 10px;
+        font-size: 12px;
+      }
+
+      .coverage-page .panel {
+        top: 8px;
+        left: 8px;
+        width: calc(100% - 16px);
+        padding: 10px;
+      }
+
+      .coverage-page .panel .description {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body class="coverage-page">
+  <header>
+    <img class="site-logo" src="image/site.png" width="480" height="480" alt="">
+    <div>
+      <h1><button id="map-guide-open" class="site-info-trigger" type="button" aria-haspopup="dialog" aria-label="このサイトの見方を開く"><span>OSM What’s New Japan</span></button></h1>
+      <small>OpenStreetMapの新着/更新地物(POI)分析サイト</small>
+    </div>
+    <button class="header-menu-toggle" type="button" aria-expanded="false" aria-controls="header-view-tabs" aria-label="画面メニューを開く">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav id="header-view-tabs" class="header-view-tabs" aria-label="画面切り替え">
+      <a class="header-view-tab" href="index.html">地図</a>
+      <a class="header-view-tab" href="details.html">分析</a>
+      <a class="header-view-tab" href="coverage.html" aria-current="page">密度</a>
+    </nav>
+  </header>
+  <main>
+    <div id="map" aria-label="約1kmタイルごとの対象地物密度"></div>
+    <section class="panel" aria-labelledby="panel-title">
+      <h2 id="panel-title">更新密度マップ（約1kmメッシュ）</h2>
+      <p class="description">選択期間に更新された対象を集計します。</p>
+      <div class="controls">
+        <label for="days">対象期間</label>
+        <select id="days">
+          <option value="7">直近1週間</option>
+          <option value="14">直近2週間</option>
+          <option value="30">直近30日</option>
+          <option value="90">直近3ヶ月</option>
+          <option value="183" selected>直近半年</option>
+          <option value="365">直近1年</option>
+        </select>
+      </div>
+      <p id="status" role="status" aria-live="polite">データを読み込んでいます…</p>
+      <div class="legend" aria-label="タイル内の対象地物数">
+        <span style="--color:#d73027">0件</span>
+        <span style="--color:#fc8d59">1件</span>
+        <span style="--color:#fee08b">2～3件</span>
+        <span style="--color:#91cf60">4～9件</span>
+        <span style="--color:#1a9850">10件以上</span>
+      </div>
+      <p id="zoom-notice" class="notice">もっとズームしてください</p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
+  <script src="help.js?v=20260731-1"></script>
+  <script src="map-view.js"></script>
+  <script>
+    'use strict';
+
+    const TILE_ZOOM = 15;
+    const MIN_DISPLAY_ZOOM = 9;
+    const MAX_REQUESTS = 20;
+    const PAGE_SIZE = 5000;
+    const MAX_ITEMS = MAX_REQUESTS * PAGE_SIZE;
+    const SOURCE_ID = 'coverage-tiles';
+    const FILL_LAYER_ID = 'coverage-fill';
+    const LINE_LAYER_ID = 'coverage-line';
+
+    const statusElement = document.querySelector('#status');
+    const daysSelect = document.querySelector('#days');
+    const zoomNotice = document.querySelector('#zoom-notice');
+    let apiUrl = '';
+    let tileCounts = new Map();
+    let truncated = false;
+
+    const emptyFeatureCollection = () => ({type: 'FeatureCollection', features: []});
+    const initialMapView = window.osmSharedMapView.read({
+      fallbackCenter: [137.2, 36.2],
+      fallbackZoom: 5,
+      minZoom: 2,
+      maxZoom: 18,
+    });
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      center: initialMapView.center,
+      zoom: initialMapView.zoom,
+      minZoom: 2,
+      maxZoom: 18,
+      maxBounds: [[118, 18], [158, 60]],
+      style: './tiles/osmfj_nopoi.json',
+    });
+    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    window.osmSharedMapView.bind(map);
+
+    function longitudeToTileX(longitude, zoom = TILE_ZOOM) {
+      return Math.floor((longitude + 180) / 360 * (2 ** zoom));
+    }
+
+    function latitudeToTileY(latitude, zoom = TILE_ZOOM) {
+      const limited = Math.max(-85.05112878, Math.min(85.05112878, latitude));
+      const radians = limited * Math.PI / 180;
+      return Math.floor(
+        (1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2 * (2 ** zoom),
+      );
+    }
+
+    function tileXToLongitude(x, zoom = TILE_ZOOM) {
+      return x / (2 ** zoom) * 360 - 180;
+    }
+
+    function tileYToLatitude(y, zoom = TILE_ZOOM) {
+      const mercator = Math.PI * (1 - 2 * y / (2 ** zoom));
+      return Math.atan(Math.sinh(mercator)) * 180 / Math.PI;
+    }
+
+    function tileKey(x, y) {
+      return `${x}/${y}`;
+    }
+
+    function tilePolygon(x, y, count) {
+      const west = tileXToLongitude(x);
+      const east = tileXToLongitude(x + 1);
+      const north = tileYToLatitude(y);
+      const south = tileYToLatitude(y + 1);
+      return {
+        type: 'Feature',
+        properties: {
+          x,
+          y,
+          count,
+          tile: `${TILE_ZOOM}/${x}/${y}`,
+        },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [west, north],
+            [east, north],
+            [east, south],
+            [west, south],
+            [west, north],
+          ]],
+        },
+      };
+    }
+
+    function visibleTiles() {
+      if (map.getZoom() < MIN_DISPLAY_ZOOM) return emptyFeatureCollection();
+      const bounds = map.getBounds();
+      const maximumTile = (2 ** TILE_ZOOM) - 1;
+      const westX = Math.max(0, longitudeToTileX(bounds.getWest()));
+      const eastX = Math.min(maximumTile, longitudeToTileX(bounds.getEast()));
+      const northY = Math.max(0, latitudeToTileY(bounds.getNorth()));
+      const southY = Math.min(maximumTile, latitudeToTileY(bounds.getSouth()));
+      const features = [];
+
+      for (let x = westX; x <= eastX; x++) {
+        for (let y = northY; y <= southY; y++) {
+          features.push(tilePolygon(x, y, tileCounts.get(tileKey(x, y)) || 0));
+        }
+      }
+      return {type: 'FeatureCollection', features};
+    }
+
+    function updateVisibleTiles() {
+      zoomNotice.hidden = map.getZoom() >= MIN_DISPLAY_ZOOM;
+      const source = map.getSource(SOURCE_ID);
+      if (!source) return;
+      source.setData(visibleTiles());
+    }
+
+    async function readJsonc(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+      const source = await response.text();
+      return JSON.parse(source.split(/\r?\n/)
+        .filter(line => !/^\s*\/\//.test(line))
+        .join('\n'));
+    }
+
+    async function readJson(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`API: HTTP ${response.status}`);
+      return response.json();
+    }
+
+    async function loadRows() {
+      const rows = [];
+      let cursor = '';
+      truncated = false;
+
+      for (let request = 0; request < MAX_REQUESTS; request++) {
+        const query = new URLSearchParams({
+          mode: 'pois',
+          days: daysSelect.value,
+          limit: String(PAGE_SIZE),
+        });
+        if (cursor) query.set('cursor', cursor);
+
+        const data = await readJson(`${apiUrl}?${query}`);
+        const batch = Array.isArray(data.items) ? data.items : [];
+        rows.push(...batch);
+        statusElement.textContent = `${rows.length.toLocaleString('ja-JP')}件を読み込んでいます…`;
+        cursor = String(data.meta?.nextCursor || '');
+        if (!cursor) return rows;
+      }
+
+      truncated = Boolean(cursor);
+      return rows;
+    }
+
+    function aggregateRows(rows) {
+      const counts = new Map();
+      for (const row of rows) {
+        const longitude = Number(row.lon);
+        const latitude = Number(row.lat);
+        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) continue;
+        const key = tileKey(
+          longitudeToTileX(longitude),
+          latitudeToTileY(latitude),
+        );
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      return counts;
+    }
+
+    function formatJstDate(value) {
+      const date = new Date(`${String(value).replace(' ', 'T')}Z`);
+      if (!Number.isFinite(date.getTime())) return '';
+      return new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(date);
+    }
+
+    function loadedDateRange(rows) {
+      const dates = rows
+        .map(row => String(row.date || ''))
+        .filter(Boolean)
+        .sort();
+      if (!dates.length) return '';
+      return `（${formatJstDate(dates[0])}～${formatJstDate(dates[dates.length - 1])}）`;
+    }
+
+    async function reload() {
+      daysSelect.disabled = true;
+      statusElement.textContent = 'データを読み込んでいます…';
+
+      try {
+        if (!apiUrl) {
+          const configuration = await readJsonc('data/config.jsonc');
+          apiUrl = String(configuration.apiUrl || '').trim();
+          if (!/^https?:\/\//.test(apiUrl)) {
+            throw new Error('data/config.jsoncのapiUrlが不正です。');
+          }
+        }
+
+        const rows = await loadRows();
+        tileCounts = aggregateRows(rows);
+        updateVisibleTiles();
+        const suffix = truncated
+          ? `（上限${MAX_ITEMS.toLocaleString('ja-JP')}件。結果は参考値です）`
+          : '';
+        const dateRange = loadedDateRange(rows);
+        statusElement.textContent =
+          `${rows.length.toLocaleString('ja-JP')}件${dateRange}・${tileCounts.size.toLocaleString('ja-JP')}タイル ${suffix}`;
+      } catch (error) {
+        console.error(error);
+        statusElement.textContent = `読み込みに失敗しました：${error.message}`;
+      } finally {
+        daysSelect.disabled = false;
+      }
+    }
+
+    map.on('load', () => {
+      map.addSource(SOURCE_ID, {
+        type: 'geojson',
+        data: emptyFeatureCollection(),
+      });
+      map.addLayer({
+        id: FILL_LAYER_ID,
+        type: 'fill',
+        source: SOURCE_ID,
+        paint: {
+          'fill-color': [
+            'step',
+            ['get', 'count'],
+            '#d73027',
+            1, '#fc8d59',
+            2, '#fee08b',
+            4, '#91cf60',
+            10, '#1a9850',
+          ],
+          'fill-opacity': 0.48,
+        },
+      });
+      map.addLayer({
+        id: LINE_LAYER_ID,
+        type: 'line',
+        source: SOURCE_ID,
+        paint: {
+          'line-color': '#4b5d55',
+          'line-width': 0.6,
+          'line-opacity': 0.7,
+        },
+      });
+      updateVisibleTiles();
+      reload();
+    });
+
+    map.on('moveend', updateVisibleTiles);
+    map.on('zoom', () => {
+      zoomNotice.hidden = map.getZoom() >= MIN_DISPLAY_ZOOM;
+    });
+
+    map.on('mousemove', FILL_LAYER_ID, event => {
+      map.getCanvas().style.cursor = event.features?.length ? 'pointer' : '';
+    });
+    map.on('mouseleave', FILL_LAYER_ID, () => {
+      map.getCanvas().style.cursor = '';
+    });
+    map.on('click', FILL_LAYER_ID, event => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      const count = Number(feature.properties.count);
+      new maplibregl.Popup()
+        .setLngLat(event.lngLat)
+        .setHTML(
+          `<strong>タイル ${feature.properties.tile}</strong><br>`
+          + `対象地物：${count.toLocaleString('ja-JP')}件`,
+        )
+        .addTo(map);
+    });
+
+    daysSelect.addEventListener('change', reload);
+  </script>
+</body>
+
+</html>

@@ -29,7 +29,7 @@ try {
         (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)
         && DateTimeImmutable::createFromFormat('!Y-m-d', $value)?->format('Y-m-d') === $value;
 
-    $allowedDays = [1, 2, 7, 14, 30, 183, 365];
+    $allowedDays = [1, 2, 7, 14, 30, 90, 183, 365];
     $days = (int) ($_GET['days'] ?? 14);
     if (!in_array($days, $allowedDays, true)) {
         $days = 14;
@@ -331,6 +331,8 @@ try {
         $pdo,
         'SELECT changeset_id AS changeset,'
         . " MIN(COALESCE(NULLIF(editor_name,''),'不明')) AS editorName,"
+        . " SUM(CASE WHEN change_action = 'create' THEN 1 ELSE 0 END) AS creates,"
+        . " SUM(CASE WHEN change_action = 'create' THEN 0 ELSE 1 END) AS `modifies`,"
         . ' COUNT(*) AS count'
         . " FROM osm_poi WHERE {$where} AND changeset_id IS NOT NULL"
         . ' GROUP BY changeset_id ORDER BY count DESC, changeset_id DESC LIMIT 100',
@@ -340,7 +342,10 @@ try {
     $stage = 'japan categories';
     $categories = $fetchAll(
         $pdo,
-        'SELECT category AS type, category_value AS value, COUNT(*) AS count'
+        'SELECT category AS type, category_value AS value,'
+        . " SUM(CASE WHEN change_action = 'create' THEN 1 ELSE 0 END) AS creates,"
+        . " SUM(CASE WHEN change_action = 'create' THEN 0 ELSE 1 END) AS `modifies`,"
+        . ' COUNT(*) AS count'
         . " FROM osm_poi WHERE {$where}"
         . ' GROUP BY category, category_value'
         . ' ORDER BY count DESC, type, value LIMIT 100',
@@ -364,6 +369,8 @@ try {
     $prefectures = $fetchAll(
         $pdo,
         'SELECT COALESCE(NULLIF(prefecture,\'\'),\'日本国外・判定不能\') AS name,'
+        . " SUM(CASE WHEN change_action = 'create' THEN 1 ELSE 0 END) AS creates,"
+        . " SUM(CASE WHEN change_action = 'create' THEN 0 ELSE 1 END) AS `modifies`,"
         . " COUNT(*) AS count FROM osm_poi WHERE {$where}"
         . ' GROUP BY COALESCE(NULLIF(prefecture,\'\'),\'日本国外・判定不能\')'
         . ' ORDER BY count DESC, name LIMIT 100',
@@ -377,10 +384,10 @@ try {
             'changesetCount' => $changesetCount,
             'mapperCount' => $mapperCount,
             'mappers' => $castCounts($mappers, ['creates', 'modifies', 'count']),
-            'changesets' => $castCounts($changesets),
-            'categories' => $castCounts($categories),
+            'changesets' => $castCounts($changesets, ['creates', 'modifies', 'count']),
+            'categories' => $castCounts($categories, ['creates', 'modifies', 'count']),
             'daily' => $castCounts($daily, ['creates', 'modifies', 'count']),
-            'prefectures' => $castCounts($prefectures),
+            'prefectures' => $castCounts($prefectures, ['creates', 'modifies', 'count']),
         ],
         JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
     );

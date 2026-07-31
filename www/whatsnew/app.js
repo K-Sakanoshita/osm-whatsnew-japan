@@ -1,13 +1,13 @@
 const mapPageUrl = new URL(window.location.href);
-const readMapParameter = (name, minimum, maximum, fallback) => {
-  const raw = mapPageUrl.searchParams.get(name);
-  if (raw === null || raw.trim() === '') return fallback;
-  const value = Number(raw);
-  return Number.isFinite(value) && value >= minimum && value <= maximum ? value : fallback;
-};
-const initialLatitude = readMapParameter('lat', -85, 85, 36.2);
-const initialLongitude = readMapParameter('lon', -180, 180, 137.2);
-const initialZoom = readMapParameter('zoom', 2, 24, 4.15);
+const initialMapView = window.osmSharedMapView.read({
+  fallbackCenter: [137.2, 36.2],
+  fallbackZoom: 4.15,
+  minZoom: 2,
+  maxZoom: 22,
+});
+const initialLatitude = initialMapView.center[1];
+const initialLongitude = initialMapView.center[0];
+const initialZoom = initialMapView.zoom;
 const STEP_PARAMETER_TO_VALUE = Object.freeze({
   '10m': '600000', '30m': '1800000', '1h': '3600000', '2h': '7200000',
   '4h': '14400000', '1d': '86400000', '1w': '604800000', '2w': '1209600000',
@@ -49,6 +49,7 @@ const map = new maplibregl.Map({
   style: './tiles/osmfj_nopoi.json',
 });
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), 'bottom-right');
+window.osmSharedMapView.bind(map);
 
 
 const status = document.querySelector('#status');
@@ -75,6 +76,8 @@ const dateTo = document.querySelector('#date-to');
 const prefectureFilterReset = document.querySelector('#prefecture-filter-reset');
 const shareButton = document.querySelector('#share-view');
 const downloadButton = document.querySelector('#download-data');
+const downloadCsvButton = document.querySelector('#download-csv');
+const mobilePrefectureFilterMedia = window.matchMedia('(max-width: 700px) and (max-aspect-ratio: 1/1)');
 const guide = window.osmWhatsNewGuide;
 const guideDialog = guide?.dialog;
 
@@ -147,6 +150,25 @@ let resumePlaybackAfterGuide = false;
 let automaticPlaybackPending = false;
 let apiUrl = '';
 let configurationPromise = null;
+
+function setPrefectureFilterExpanded(expanded) {
+  prefectureFilterToggle.setAttribute('aria-expanded', String(expanded));
+  prefectureFilter.hidden = !expanded;
+  document.body.classList.toggle('is-mobile-prefecture-selecting', expanded && mobilePrefectureFilterMedia.matches);
+  renderVirtualList(true);
+  if (expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
+}
+
+function closeMobilePrefectureFilter() {
+  if (mobilePrefectureFilterMedia.matches) setPrefectureFilterExpanded(false);
+}
+
+mobilePrefectureFilterMedia.addEventListener('change', () => {
+  const expanded = prefectureFilterToggle.getAttribute('aria-expanded') === 'true';
+  document.body.classList.toggle('is-mobile-prefecture-selecting', expanded && mobilePrefectureFilterMedia.matches);
+  if (expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
+});
+
 const PREFECTURE_MINI_SOURCE = 'mini-prefectures';
 const PREFECTURE_MINI_FILL_LAYER = 'mini-prefectures-fill';
 const PREFECTURE_MINI_SELECTED_LAYER = 'mini-prefectures-selected';
@@ -160,7 +182,7 @@ const prefectureCode = feature => String(feature?.properties?.['ISO3166-2'] || '
 function updateTimelineSummary() {
   timelineSummaryPrefecture.textContent = selectedPrefecture || '全国';
   if (!markerEntries.length) {
-    timelineSummaryDatetime.textContent = '対象日時 —';
+    timelineSummaryDatetime.textContent = '—';
     timelineSummaryDatetime.removeAttribute('datetime');
     timelineSummaryDatetime.removeAttribute('title');
   }
@@ -180,13 +202,7 @@ const fmt = value => {
   }).formatToParts(parseUtcDate(value)).map(part => [part.type, part.value]));
   return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute} (JST)`;
 };
-const fmtTimelineSummary = value => {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: 'numeric',
-    hourCycle: 'h23', timeZone: 'Asia/Tokyo',
-  }).formatToParts(parseUtcDate(value)).map(part => [part.type, part.value]));
-  return `${parts.month}/${parts.day} ${parts.hour}時`;
-};
+const fmtTimelineSummary = fmt;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 })[character]);
@@ -252,6 +268,58 @@ function downloadCurrentData() {
   const area = (selectedPrefecture || 'japan').replace(/[\\/:*?"<>|]/g, '_');
   link.href = url;
   link.download = `osm-whatsnew_${area}_${dateFrom.value}_${dateTo.value}.geojson`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadCurrentCsv() {
+  const rows = markerEntries.map(entry => entry.item).map(item => {
+    const longitude = Number(item.lon);
+    const latitude = Number(item.lat);
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
+    return [
+      item.name || '',
+      item.prefecture || '',
+      item.action || '',
+      item.action === 'create' ? '新規' : '更新',
+      item.date || '',
+      fmt(item.date),
+      item.type || '',
+      item.kind || '',
+      item.categoryName || '',
+      item.osmType || 'node',
+      String(item.id ?? ''),
+      String(item.changeset ?? ''),
+      item.editorName || '',
+      String(item.editorUid ?? ''),
+      latitude,
+      longitude,
+      JSON.stringify(Object.fromEntries(
+        Object.entries(item.tags || {}).sort(([left], [right]) => left.localeCompare(right)),
+      )),
+    ];
+  }).filter(Boolean);
+  if (!rows.length) return;
+
+  const csvCell = value => {
+    let text = String(value ?? '');
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const headers = [
+    'name', 'prefecture', 'update_action', 'update_action_label',
+    'updated_at', 'updated_at_jst', 'category', 'category_value',
+    'category_name', 'osm_type', 'osm_id', 'changeset',
+    'editor_name', 'editor_uid', 'latitude', 'longitude', 'tags',
+  ];
+  const csv = '\uFEFF' + [headers, ...rows]
+    .map(row => row.map(csvCell).join(','))
+    .join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+  const link = document.createElement('a');
+  const area = (selectedPrefecture || 'japan').replace(/[\\/:*?"<>|]/g, '_');
+  link.href = url;
+  link.download = `osm-whatsnew_${area}_${dateFrom.value}_${dateTo.value}.csv`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -579,6 +647,7 @@ async function initializePrefectureMiniMap() {
       if (!name) return;
       selectedPrefecture = name;
       updatePrefectureMiniMapSelection();
+      closeMobilePrefectureFilter();
       const box = prefectureBounds(selectedPrefectureFeature());
       map.fitBounds([[box[0], box[1]], [box[2], box[3]]], {padding: 42, duration: 350, maxZoom: 9});
       resetSharedTimelineTime();
@@ -655,11 +724,25 @@ async function loadDefinitions() {
 
 function lookupRule(rules, tags, fallback) {
   for (const [key, values] of Object.entries(rules)) {
-    if (key === '*' || !tags[key]) continue;
+    if (key === '*' || key === 'building' || !tags[key]) continue;
     if (values[tags[key]]) return values[tags[key]];
     if (values['*']) return values['*'];
   }
+  const buildingRules = rules.building;
+  if (buildingRules && tags.building) {
+    if (buildingRules[tags.building]) return buildingRules[tags.building];
+    if (buildingRules['*']) return buildingRules['*'];
+  }
   return rules['*']?.['*'] || fallback;
+}
+
+function lookupPrimaryRule(rules, tags, primaryKey, primaryValue, fallback) {
+  const primaryRules = rules[primaryKey];
+  if (primaryKey !== 'building' && primaryRules && primaryValue) {
+    if (primaryRules[primaryValue]) return primaryRules[primaryValue];
+    if (primaryRules['*']) return primaryRules['*'];
+  }
+  return lookupRule(rules, tags, fallback);
 }
 
 function decorateItem(item) {
@@ -671,8 +754,8 @@ function decorateItem(item) {
   return {
     ...item,
     tags,
-    icon: lookupRule(markerRules, tags, 'marker-stroked.png'),
-    categoryName: lookupRule(categoryRules, tags, item.kind || '—'),
+    icon: lookupPrimaryRule(markerRules, tags, item.type, item.kind, 'marker-stroked.png'),
+    categoryName: lookupPrimaryRule(categoryRules, tags, item.type, item.kind, item.kind || '—'),
   };
 }
 
@@ -691,6 +774,7 @@ function clearMarkers() {
   poiFeatures = [];
   updateTimelineSummary();
   downloadButton.disabled = true;
+  downloadCsvButton.disabled = true;
   visibleListCount = 0;
   clusterVisibleCount = -1;
   highlightedListStart = 0;
@@ -1070,7 +1154,7 @@ function updateHighlight() {
   else renderVirtualList(true);
 
   const highlighted = Math.max(0, highlightEnd - highlightStart);
-  timelineSummaryDatetime.textContent = `対象日時 ${fmtTimelineSummary(selected)}`;
+  timelineSummaryDatetime.textContent = fmtTimelineSummary(selected);
   timelineSummaryDatetime.dateTime = new Date(selected).toISOString();
   timelineSummaryDatetime.title = fmt(selected);
   timelineSummaryCount.textContent = `更新${highlighted.toLocaleString('ja-JP')}件（累積${visible.toLocaleString('ja-JP')}件）`;
@@ -1420,6 +1504,7 @@ async function show(items) {
   if (currentRender !== renderVersion) return;
   status.hidden = true;
   downloadButton.disabled = false;
+  downloadCsvButton.disabled = false;
   timeline.hidden = false;
   requestAutomaticPlayback();
 }
@@ -1481,10 +1566,7 @@ summaryPlayButton.addEventListener('click', () => {
 });
 prefectureFilterToggle.addEventListener('click', () => {
   const expanded = prefectureFilterToggle.getAttribute('aria-expanded') === 'true';
-  prefectureFilterToggle.setAttribute('aria-expanded', String(!expanded));
-  prefectureFilter.hidden = expanded;
-  renderVirtualList(true);
-  if (!expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
+  setPrefectureFilterExpanded(!expanded);
 });
 timelineToggle.addEventListener('click', () => {
   const expanded = timelineToggle.getAttribute('aria-expanded') !== 'true';
@@ -1562,6 +1644,7 @@ if (validDateParameter(requestedDateFrom)
 prefectureFilterReset.addEventListener('click', () => {
   selectedPrefecture = '';
   updatePrefectureMiniMapSelection();
+  closeMobilePrefectureFilter();
   resetSharedTimelineTime();
   load();
 });
@@ -1619,6 +1702,7 @@ async function copyCurrentViewUrl() {
   }
 }
 downloadButton.addEventListener('click', downloadCurrentData);
+downloadCsvButton.addEventListener('click', downloadCurrentCsv);
 shareButton?.addEventListener('click', copyCurrentViewUrl);
 guideDialog?.addEventListener('osm-guide-before-open', handleGuideBeforeOpen);
 guideDialog?.addEventListener('osm-guide-closed', handleGuideClosed);

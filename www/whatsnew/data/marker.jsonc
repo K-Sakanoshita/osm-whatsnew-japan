@@ -9,6 +9,7 @@
                 "*": "marker-stroked.png"
             },
             "advertising": {
+                "billboard": "billboard.png",
                 "board": "billboard.png",
                 "sign": "map-signs.png"
             },
@@ -44,6 +45,7 @@
                 "college": "college.png",
                 "community_centre": "town-hall.png",
                 "compressed_air": "powered_pump.png",
+                "co-working": "commercial.png",
                 "courthouse": "courthouse.png",
                 "coworking_space": "commercial.png",
                 "crematorium": "marker-stroked.png",
@@ -78,6 +80,7 @@
                 "marketplace": "shopping-basket.png",
                 "mist_spraying_cooler": "water.png",
                 "motorcycle_parking": "motorcycle-solid.png",
+                "motorcycle_rental": "motorcycle_rental.png",
                 "music_school": "music.png",
                 "nightclub": "music.png",
                 "nursing_home": "social_facility.png",
@@ -99,6 +102,7 @@
                 "public_bookcase": "public_bookcase.png",
                 "ranger_station": "ranger-station.png",
                 "recycling": "recycling.png",
+                "research_institute": "medical_supply.png",
                 "restaurant": "restaurant.png",
                 "sanitary_dump_station": "camper_trailer_dump.png",
                 "school": "school-JP.png",
@@ -174,6 +178,9 @@
                 "roof": "home.png",
                 "yes": "home.png"
             },
+            "cemetery": {
+                "sector": "cemetery.png"
+            },
             "craft": {
                 "brewery": "storage_fermenter.png",
                 "carpenter": "anvil_and_hammer.png",
@@ -189,6 +196,7 @@
                 "painter": "paint.png",
                 "pottery": "hand.png",
                 "distillery": "alcohol-shop.png",
+                "electrician": "briefcase_bolt.png",
                 "tailor": "needle_and_spool.png",
                 "shoemaker": "hammer_shoe.png",
                 "carpet_layer": "construction.png",
@@ -216,6 +224,7 @@
                 "fire_lookout": "fire_lookout_B-14.png",
                 "defibrillator": "defibrillator.png",
                 "siren": "speaker.png",
+                "suction_point": "powered_pump.png",
                 "water_tank": "water.png"
             },
             "entrance": {
@@ -282,6 +291,7 @@
                 "it": "computer.png",
                 "lawyer": "lawyer.png",
                 "logistics": "truck.png",
+                "moving_company": "truck.png",
                 "newspaper": "newspaper-solid.png",
                 "ngo": "briefcase_info.png",
                 "notary": "lawyer.png",
@@ -332,18 +342,21 @@
                 "convenience": "shopping-basket.png",
                 "copyshop": "newspaper-solid.png",
                 "cosmetics": "beauty_salon.png",
+                "curtain": "curtains.png",
                 "dairy": "cheese.png",
                 "deli": "deli.png",
                 "department_store": "shop.png",
                 "doityourself": "tools.png",
                 "dry_cleaning": "clothes_hanger.png",
                 "electronics": "electronic.png",
+                "erotic": "heart.png",
                 "farm": "apple-alt.png",
                 "florist": "florist.png",
                 "fishing": "ice_fishing.png",
                 "frozen_food": "shop.png",
                 "funeral_directors": "cemetery.png",
                 "furniture": "furniture.png",
+                "games": "dice.png",
                 "garden_centre": "garden_centre.png",
                 "general": "shop.png",
                 "gift": "gift.png",
@@ -357,15 +370,18 @@
                 "interior_decoration": "interior_decoration.png",
                 "jewelry": "jewelry-store.png",
                 "kiosk": "store.png",
+                "kitchen": "kitchen_sink.png",
                 "laundry": "laundry.png",
                 "mall": "shopping_mall.png",
                 "massage": "massage.png",
                 "medical_supply": "medical_supply.png",
-                "motorcycle": "motorcycle.png",
                 "mobile_phone": "mobile-phone.png",
+                "model": "dice.png",
+                "motorcycle": "motorcycle.png",
                 "newsagent": "newspaper-solid.png",
                 "optician": "optician.png",
                 "outdoor": "campsite.png",
+                "outpost": "store.png",
                 "pasta": "restaurant.png",
                 "pastry": "bakery.png",
                 "pawnbroker": "money_hand.png",
@@ -434,9 +450,11 @@
             },
             "natural": {
                 "beach": "beach.png",
+                "cape": "cape_landform.png",
                 "cave_entrance": "adit_profile.png",
                 "cliff": "cliff_falling_rocks.png",
                 "grassland": "grass.png",
+                "hot_spring": "hot-spring.png",
                 "peak": "mountain.png",
                 "rock": "boulder1.png",
                 "saddle": "saddle.png",
@@ -460,10 +478,12 @@
                 "bus_stop": "board_bus.png",
                 "crossing": "pedestrian_crosswalk.png",
                 "emergency_access_point": "emergency-phone.png",
+                "traffic_mirror": "circle-stroked.png",
                 "give_way": "yield.png",
                 "mini_roundabout": "junction.png",
                 "milestone": "milestone.png",
                 "motorway_junction": "junction.png",
+                "passing_place": "parking_space.png",
                 "rest_area": "highway-rest-area.png",
                 "services": "highway-rest-area.png",
                 "speed_camera": "security_camera.png",
@@ -476,6 +496,9 @@
             },
             "social_facility": {
                 "shelter": "shelter.png"
+            },
+            "sport": {
+                "climbing": "climbing.png"
             },
             "playground": {
                 "activitypanel": "playground.png",
@@ -609,7 +632,9 @@
                 "obelisk": "obelisk.png",
                 "petroleum_well": "oil_well.png",
                 "pier": "pier_fixed.png",
+                "planter": "garden_bed.png",
                 "pumping_station": "powered_pump.png",
+                "sign": "map-signs.png",
                 "silo": "silo.png",
                 "storage_tank": "storage_tank.png",
                 "telescope": "telescope.png",
@@ -626,6 +651,9 @@
                 "watermill": "watermill.png",
                 "windmill": "windmill.png",
                 "works": "factory.png"
+            },
+            "junction": {
+                "yes": "junction.png"
             },
             "landuse": {
                 "farmland": "farm.png",
@@ -700,6 +728,7 @@
                 "island": "island_trees_building.png",
                 "islet": "islet_tree.png",
                 "locality": "pin.png",
+                "sea": "water.png",
                 "square": "square-stroked.png",
                 "suburb": "triangle.png",
                 "quarter": "triangle.png",
@@ -711,6 +740,7 @@
                 "aerodrome": "airport.png",
                 "gate": "airport.png",
                 "helipad": "heliport.png",
+                "launchpad": "rocket.png",
                 "terminal": "airport.png",
                 "windsock": "windsock.png"
             },
