@@ -342,6 +342,7 @@ api.php?mode=facets&days=30&prefecture=愛知県
 - 代表タグの判定では、`building=*` と他の対象タグが併記されている場合に建物以外を優先するようにしました。
 - カテゴリとマーカー定義へ `shop=games`、`amenity=co-working`、`craft=electrician`、`amenity=research_institute`、`emergency=suction_point`、`cemetery=sector`、`man_made=planter`、`office=moving_company`、`amenity=motorcycle_rental`、`natural=hot_spring`、`place=sea`、`shop=kitchen`、`shop=erotic`、`shop=model`、`shop=curtain`、`junction=yes`、`shop=outpost`、`sport=climbing`、`advertising=billboard`、`aeroway=launchpad`、`natural=cape`、`man_made=sign`、`highway=traffic_mirror`、`highway=passing_place` を追加しました。
 - サイト説明を「OpenStreetMapの新着/更新地物(POI)分析サイト」に統一し、共通モーダルの配置・説明・運営者リンクを整理しました。
+- 更新密度マップのCSSを共通の `style.css` へ統合し、各画面のタイトルを「新着/更新マップ」「データ分析」「更新密度マップ」に整理しました。更新密度マップにはcanonical、OG、Twitter Cardなどのメタ情報も追加しました。
 
 ### 2026-07-30
 
