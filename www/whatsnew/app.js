@@ -607,9 +607,10 @@ async function initializePrefectureMiniMap() {
     dragRotate: false,
     keyboard: true,
     doubleClickZoom: true,
-    touchZoomRotate: false,
+    touchZoomRotate: true,
     style: './tiles/osmfj_nopoi.json',
   });
+  prefectureMiniMap.touchZoomRotate.disableRotation();
   prefectureMiniMap.addControl(new maplibregl.NavigationControl({showCompass: false}), 'top-right');
   prefectureMiniMap.on('load', () => {
     prefectureMiniMap.setPitch(0);

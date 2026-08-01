@@ -45,12 +45,22 @@ try {
         if (!$validDate($from) || !$validDate($to) || $from > $to) {
             throw new InvalidArgumentException('The date range is invalid.');
         }
-        $periodStart = "{$from} 00:00:00";
-        $periodEnd = "{$to} 23:59:59";
-        $periodEndExclusive = (new DateTimeImmutable(
+        // Date inputs represent calendar days in Japan, while osm_timestamp is UTC.
+        $japanTimeZone = new DateTimeZone('Asia/Tokyo');
+        $utcTimeZone = new DateTimeZone('UTC');
+        $periodStartDate = new DateTimeImmutable("{$from} 00:00:00", $japanTimeZone);
+        $periodEndExclusiveDate = (new DateTimeImmutable(
             "{$to} 00:00:00",
-            new DateTimeZone('UTC')
-        ))->modify('+1 day')->format('Y-m-d H:i:s');
+            $japanTimeZone
+        ))->modify('+1 day');
+        $periodStart = $periodStartDate->setTimezone($utcTimeZone)->format('Y-m-d H:i:s');
+        $periodEndExclusive = $periodEndExclusiveDate
+            ->setTimezone($utcTimeZone)
+            ->format('Y-m-d H:i:s');
+        $periodEnd = $periodEndExclusiveDate
+            ->modify('-1 second')
+            ->setTimezone($utcTimeZone)
+            ->format('Y-m-d H:i:s');
     } else {
         $stage = 'default period';
         $periodStatement = $pdo->query(

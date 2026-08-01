@@ -110,8 +110,18 @@
       maxZoom: 18,
       maxBounds: [[118, 18], [158, 60]],
       style: './tiles/osmfj_nopoi.json',
+      locale: {
+        'GeolocateControl.FindMyLocation': '現在地へ移動',
+        'GeolocateControl.LocationNotAvailable': '現在地を取得できません',
+      },
     });
     map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    map.addControl(new maplibregl.GeolocateControl({
+      positionOptions: {enableHighAccuracy: true},
+      trackUserLocation: false,
+      showUserLocation: true,
+      fitBoundsOptions: {maxZoom: 15},
+    }), 'bottom-right');
     window.osmSharedMapView.bind(map);
 
     function longitudeToTileX(longitude, zoom = TILE_ZOOM) {
