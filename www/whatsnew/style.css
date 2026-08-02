@@ -522,6 +522,7 @@ button {
 
 .map-page.is-demo-mode aside,
 .map-page.is-demo-mode .map-top-left-overlays,
+.map-page.is-demo-mode .loading-status,
 .map-page.is-demo-mode .maplibregl-control-container {
   display: none
 }
@@ -545,12 +546,17 @@ button {
   display: none
 }
 
+.map-page.is-demo-mode.is-demo-details-open .timeline-ends {
+  display: none
+}
+
 .map-page.is-demo-mode.is-demo-details-open #prefecture-filter-toggle,
 .map-page.is-demo-mode.is-demo-details-open #demo-mode,
 .map-page.is-demo-mode.is-demo-details-open #download-data,
 .map-page.is-demo-mode.is-demo-details-open #download-csv,
 .map-page.is-demo-mode.is-demo-details-open #share-view,
 .map-page.is-demo-mode.is-demo-details-open #share-status,
+.map-page.is-demo-mode.is-demo-details-open .timeline-auxiliary-controls,
 .map-page.is-demo-mode.is-demo-details-open .map-marker-legend {
   display: none
 }
@@ -833,7 +839,7 @@ button {
   width: auto;
   margin: 0;
   padding: 0;
-  background: #75bde8
+  pointer-events: none
 }
 
 .map-page .prefecture-filter[hidden] {
@@ -882,18 +888,8 @@ button {
   color: #84938e
 }
 
-.map-page #prefecture-mini-map {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border: 0;
-  border-radius: inherit;
-  background: #75bde8
-}
-
 .map-page .timeline,
 .map-page .loading-status {
-  position: static;
   width: 100%;
   padding: 10px 16px 9px;
   border: 1px solid rgba(255, 255, 255, .8);
@@ -901,6 +897,18 @@ button {
   background: rgba(255, 255, 255, .94);
   box-shadow: 0 5px 18px rgba(24, 54, 44, .2);
   backdrop-filter: blur(8px)
+}
+
+.map-page .timeline {
+  position: static
+}
+
+.map-page .loading-status {
+  position: absolute;
+  z-index: 6;
+  top: 10px;
+  left: 10px;
+  width: min(760px, calc(100% - 20px))
 }
 
 .map-page .timeline[hidden],
@@ -911,10 +919,21 @@ button {
 .map-page .timeline-summary {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   min-height: 32px;
   color: #40564e;
   white-space: nowrap
+}
+
+.map-page .timeline-map-title {
+  flex: 0 0 auto;
+  margin: 0;
+  color: #173f34;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: .01em
 }
 
 .map-page .timeline-summary>strong {
@@ -948,9 +967,26 @@ button {
   font-size: 16px
 }
 
+.map-page .timeline-summary-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  order: 2;
+  flex: 0 0 100%;
+  gap: 10px
+}
+
+.map-page .timeline-summary-time-row #timeline-summary-count {
+  margin: 0
+}
+
 .map-page .timeline-summary-actions {
   display: flex;
   align-items: center;
+  order: 1;
+  flex: 0 0 auto;
+  width: auto;
+  justify-content: flex-end;
   gap: 6px;
   margin-left: auto
 }
@@ -984,8 +1020,8 @@ button {
 .map-page #prefecture-filter-reset {
   position: absolute;
   z-index: 5;
-  top: 14px;
-  left: 14px;
+  bottom: 16px;
+  left: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -997,7 +1033,8 @@ button {
   color: #126047;
   font-size: 12px;
   line-height: 1.15;
-  box-shadow: 0 2px 7px rgba(16, 72, 55, .25)
+  box-shadow: 0 2px 7px rgba(16, 72, 55, .25);
+  pointer-events: auto
 }
 
 .map-page #prefecture-filter-reset span {
@@ -1047,7 +1084,7 @@ button {
   justify-content: center;
   flex: 0 0 auto;
   width: 32px;
-  min-height: 30px;
+  height: 30px;
   padding: 5px;
   border-color: #8daaa0;
   background: #fff;
@@ -1074,8 +1111,9 @@ button {
   flex: 0 0 auto;
   width: 32px;
   min-width: 32px;
-  min-height: 30px;
+  height: 30px;
   padding: 5px;
+  border-color: #8daaa0;
   line-height: 1
 }
 
@@ -1123,6 +1161,13 @@ button {
   margin-top: 6px
 }
 
+.map-page .timeline-display-controls,
+.map-page .timeline-auxiliary-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px
+}
+
 .map-page .timeline-controls button {
   margin: 0
 }
@@ -1130,6 +1175,24 @@ button {
 .map-page .timeline-controls button:disabled {
   opacity: .45;
   cursor: not-allowed
+}
+
+.map-page .timeline-action-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #55635e;
+  font-size: 12px;
+  white-space: nowrap
+}
+
+.map-page .timeline-action-filter-label select {
+  min-width: 70px;
+  height: 30px;
+  padding: 0 24px 0 8px;
+  border-color: #8daaa0;
+  color: #0b654f;
+  font-size: 12px
 }
 
 .map-page .timeline-region-button {
@@ -1248,23 +1311,38 @@ button {
   border: 0 !important
 }
 
+.map-page .timeline-action-filter-label,
 .map-page .timeline-period-label,
 .map-page .timeline-step-label {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 12px;
   color: #40564e;
   white-space: nowrap
 }
 
+.map-page .timeline-action-filter-label select,
 .map-page .timeline-period-label select,
 .map-page .timeline-step-label select {
-  padding: 4px 6px;
-  border: 1px solid #b9c9c1;
-  border-radius: 5px;
+  height: 30px;
+  padding: 0 26px 0 8px;
+  border: 1px solid #8daaa0;
+  border-radius: 6px;
   background: #fff;
+  color: #0b654f;
+  font: inherit;
   font-size: 12px
+}
+
+.map-page .timeline-action-filter-label select {
+  width: 92px;
+  min-width: 92px
+}
+
+.map-page .timeline-step-label select {
+  width: 72px;
+  min-width: 72px
 }
 
 .map-page .timeline-dates {
@@ -1287,11 +1365,15 @@ button {
 
 .map-page .timeline-dates input {
   width: 140px;
-  padding: 4px 6px;
-  border: 1px solid #b9c9c1;
-  border-radius: 5px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #8daaa0;
+  border-radius: 6px;
   background: #fff;
-  font: inherit
+  color: #0b654f;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box
 }
 
 .map-page .osm-menu {
@@ -1447,7 +1529,7 @@ button {
   position: absolute;
   z-index: 3;
   left: 10px;
-  bottom: 10px;
+  bottom: 50px;
   margin: 0;
   padding: 7px 10px;
   border: 1px solid rgba(88, 111, 103, .35);
@@ -1504,7 +1586,39 @@ button {
   gap: 18px
 }
 
-.details-page .map-guide-title button {
+.details-page .map-guide-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0
+}
+
+.details-page #details-summary-prefecture {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  max-width: 150px;
+  margin: 0;
+  padding: 5px 10px;
+  overflow: hidden;
+  border: 1px solid #91b9ab;
+  border-radius: 999px;
+  background: #e4f3ee;
+  color: #174d3e;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box
+}
+
+.details-page #show-nationwide {
+  position: absolute;
+  z-index: 3;
+  bottom: 10px;
+  left: 10px;
+  margin: 0;
   padding: 5px 9px;
   border: 1px solid #b6c9c1;
   border-radius: 6px;
@@ -1516,11 +1630,11 @@ button {
   cursor: pointer
 }
 
-.details-page .map-guide-title button:hover:not(:disabled) {
+.details-page #show-nationwide:hover:not(:disabled) {
   background: #0d4e3e
 }
 
-.details-page .map-guide-title button:disabled {
+.details-page #show-nationwide:disabled {
   background: #e8eeeb;
   color: #87958f;
   cursor: default
@@ -1695,6 +1809,29 @@ button {
 
 .details-page .ranking-heading {
   justify-content: space-between
+}
+
+.details-page .chart-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px
+}
+
+.details-page .chart-action-filter {
+  height: 30px;
+  min-width: 104px;
+  padding: 0 26px 0 8px;
+  border: 1px solid #8daaa0;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b654f;
+  font: inherit;
+  font-size: 12px
+}
+
+.details-page .chart-action-filter:focus-visible {
+  outline: 2px solid rgba(8, 127, 91, .3);
+  outline-offset: 1px
 }
 
 .details-page .ranking-heading .csv-icon-button,
@@ -1875,12 +2012,16 @@ button {
   }
 
   .map-page .timeline-summary-actions {
-    width: 100%;
+    width: auto;
     justify-content: flex-end
   }
 }
 
 @media(max-width:900px) {
+  .map-page .map-top-left-overlays {
+    width: calc(100% - 20px)
+  }
+
   .details-page main {
     padding: 14px 10px
   }
@@ -1907,6 +2048,18 @@ button {
   }
 }
 
+@media(max-width:1100px) and (min-aspect-ratio:1/1),
+  (hover:none) and (pointer:coarse) and (min-aspect-ratio:1/1) {
+  .map-page .map-shell {
+    overflow: visible
+  }
+
+  .map-page .timeline {
+    width: calc(100vw - 46px);
+    max-width: none
+  }
+}
+
 @media(max-width:700px) {
   header h1 {
     font-size: 20px
@@ -1915,6 +2068,15 @@ button {
   .details-page .chart-wrap,
   .details-page .chart-wrap-daily {
     height: 300px
+  }
+
+  .details-page .ranking-heading {
+    align-items: flex-start;
+    flex-wrap: wrap
+  }
+
+  .details-page .chart-heading-actions {
+    margin-left: auto
   }
 
   .details-page #prefecture-map {
@@ -2158,6 +2320,10 @@ button {
     border-radius: 11px
   }
 
+  .map-page .timeline {
+    width: 100%
+  }
+
   .map-page .timeline-summary {
     gap: 7px;
     font-size: 12px
@@ -2205,27 +2371,41 @@ button {
   }
 
   .map-page .timeline-controls {
-    justify-content: center;
+    align-items: stretch;
+    flex-wrap: wrap;
     gap: 5px;
     margin-top: 5px
   }
 
+  .map-page .timeline-display-controls {
+    flex: 0 1 auto;
+    justify-content: center
+  }
+
+  .map-page .timeline-auxiliary-controls {
+    flex: 0 0 auto;
+    justify-content: center
+  }
+
+  .map-page .timeline-action-filter-label,
   .map-page .timeline-period-label,
   .map-page .timeline-step-label {
     font-size: 11px;
     gap: 3px
   }
 
+  .map-page .timeline-action-filter-label select,
   .map-page .timeline-period-label select,
   .map-page .timeline-step-label select {
-    padding: 4px;
+    height: 30px;
+    padding: 0 22px 0 6px;
     font-size: 11px
   }
 
   .map-page .timeline-icon-button,
   .map-page .timeline-share-button {
     width: 38px;
-    height: 29px;
+    height: 30px;
     flex-basis: 38px
   }
 }
@@ -2775,7 +2955,7 @@ html,
 
 .coverage-page .legend {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 3px;
   margin-top: 8px;
   font-size: .7rem;
@@ -2789,6 +2969,12 @@ html,
   border-radius: 2px;
   background: var(--color);
   content: ""
+}
+
+.coverage-page .legend .is-transparent::before {
+  border: 1px dashed #8fa39b;
+  background: transparent;
+  box-sizing: border-box
 }
 
 .coverage-page #status {

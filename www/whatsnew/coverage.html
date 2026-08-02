@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>更新密度マップ｜OSM What’s New Japan</title>
+  <title>更新密度｜OSM What’s New Japan</title>
   <meta name="description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#12634f">
@@ -13,7 +13,7 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ja_JP">
   <meta property="og:site_name" content="OSM What’s New Japan">
-  <meta property="og:title" content="更新密度マップ｜OSM What’s New Japan">
+  <meta property="og:title" content="更新密度｜OSM What’s New Japan">
   <meta property="og:description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
   <meta property="og:url" content="https://armd-01.sakura.ne.jp/whatsnew/coverage.html">
   <meta property="og:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
@@ -21,11 +21,11 @@
   <meta property="og:image:height" content="941">
   <meta property="og:image:alt" content="OSM What’s New Japan 画面イメージ">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="更新密度マップ｜OSM What’s New Japan">
+  <meta name="twitter:title" content="更新密度｜OSM What’s New Japan">
   <meta name="twitter:description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260731-9">
+  <link rel="stylesheet" href="style.css?v=20260802-33">
 </head>
 
 <body class="coverage-page">
@@ -47,26 +47,27 @@
   <main>
     <div id="map" aria-label="約1kmタイルごとの対象地物密度"></div>
     <section class="panel" aria-labelledby="panel-title">
-      <h2 id="panel-title">更新密度マップ（約1kmメッシュ）</h2>
+      <h2 id="panel-title">更新密度（約1kmメッシュ）</h2>
       <p class="description">選択期間に更新された対象を集計します。</p>
       <div class="controls">
         <label for="days">対象期間</label>
         <select id="days">
           <option value="7">直近1週間</option>
-          <option value="14">直近2週間</option>
+          <option value="14" selected>直近2週間</option>
           <option value="30">直近30日</option>
           <option value="90">直近3ヶ月</option>
-          <option value="183" selected>直近半年</option>
+          <option value="183">直近半年</option>
           <option value="365">直近1年</option>
         </select>
       </div>
       <p id="status" role="status" aria-live="polite">データを読み込んでいます…</p>
       <div class="legend" aria-label="タイル内の対象地物数">
-        <span style="--color:#d73027">0件</span>
-        <span style="--color:#fc8d59">1件</span>
-        <span style="--color:#fee08b">2～3件</span>
-        <span style="--color:#91cf60">4～9件</span>
-        <span style="--color:#1a9850">10件以上</span>
+        <span class="is-transparent" style="--color:transparent">0件</span>
+        <span style="--color:#e5f5e0">1件</span>
+        <span style="--color:#bae4b3">2～4件</span>
+        <span style="--color:#74c476">5～7件</span>
+        <span style="--color:#31a354">8～9件</span>
+        <span style="--color:#006d2c">10件以上</span>
       </div>
       <p id="zoom-notice" class="notice">もっとズームしてください</p>
     </section>
@@ -318,13 +319,14 @@
           'fill-color': [
             'step',
             ['get', 'count'],
-            '#d73027',
-            1, '#fc8d59',
-            2, '#fee08b',
-            4, '#91cf60',
-            10, '#1a9850',
+            'rgba(0,0,0,0)',
+            1, '#e5f5e0',
+            2, '#bae4b3',
+            5, '#74c476',
+            8, '#31a354',
+            10, '#006d2c',
           ],
-          'fill-opacity': 0.48,
+          'fill-opacity': ['step', ['get', 'count'], 0, 1, 0.52],
         },
       });
       map.addLayer({
@@ -334,7 +336,7 @@
         paint: {
           'line-color': '#4b5d55',
           'line-width': 0.6,
-          'line-opacity': 0.7,
+          'line-opacity': 0.3,
         },
       });
       updateVisibleTiles();

@@ -3,6 +3,7 @@ const daysElement = document.querySelector('#days');
 const fromElement = document.querySelector('#from');
 const toElement = document.querySelector('#to');
 const statusElement = document.querySelector('#status');
+const detailsSummaryPrefecture = document.querySelector('#details-summary-prefecture');
 let prefectureFeatures = [];
 let selectedPrefecture = '';
 let categoryRules = {};
@@ -13,6 +14,8 @@ let apiUrl = '';
 let categoryMapperRequest = 0;
 const csvLists = {};
 const charts = {};
+const chartRenderers = {};
+const chartCompanionRenderers = {};
 const CREATE_COLOR = '#177866';
 const MODIFY_COLOR = '#c45f32';
 const prefectureCountsCache = new Map();
@@ -140,13 +143,12 @@ function renderPrefectureColors(items) {
   });
 
   const ranked = [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], 'ja'));
-  const positiveCount = ranked.filter(([, count]) => count > 0).length;
+  const maximumCount = ranked[0]?.[1] || 0;
   const rankByName = new Map(ranked.map(([name], index) => [name, index + 1]));
   const intensityByName = new Map();
-  ranked.forEach(([name, count], index) => {
+  ranked.forEach(([name, count]) => {
     if (!count) intensityByName.set(name, 0);
-    else if (positiveCount <= 1) intensityByName.set(name, 1);
-    else intensityByName.set(name, 0.12 + 0.88 * (positiveCount - index - 1) / (positiveCount - 1));
+    else intensityByName.set(name, Math.log1p(count) / Math.log1p(maximumCount));
   });
 
   prefectureFeatures.forEach(feature => {
@@ -179,6 +181,7 @@ function selectedPrefectureName() {
 
 function updateMapSelection() {
   nationwideButton.disabled = !selectedPrefecture;
+  detailsSummaryPrefecture.textContent = selectedPrefecture || '全国';
   if (!prefectureMap?.getLayer(PREFECTURE_SELECTED_LAYER)) return;
   prefectureMap.setFilter(PREFECTURE_SELECTED_LAYER, ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture]);
 }
@@ -210,11 +213,17 @@ function initializePrefectureMap(geojson) {
       source: 'prefecture-boundaries',
       paint: {
         'fill-color': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'updateIntensity'], 0],
-          0, '#d8efdd',
-          0.35, '#91cf9b',
-          0.7, '#f5c05e',
-          1, '#f08024',
+          'case',
+          ['==', ['coalesce', ['get', 'updateCount'], 0], 0],
+          'rgba(0,0,0,0)',
+          [
+            'interpolate', ['linear'], ['coalesce', ['get', 'updateIntensity'], 0],
+            0, '#e5f5e0',
+            0.25, '#bae4b3',
+            0.5, '#74c476',
+            0.75, '#31a354',
+            1, '#006d2c',
+          ],
         ],
         'fill-opacity': 0.48,
         'fill-outline-color': '#35674f',
@@ -296,17 +305,82 @@ function categoryName(row) {
   return categoryRules[row.type]?.[row.value] || row.value || '不明';
 }
 
+function selectedChartAction(id) {
+  return document.querySelector(`[data-chart-action="${id}"]`)?.value || 'both';
+}
+
+function filterChartEntries(entries, action) {
+  if (action === 'both') return entries;
+  const field = action === 'create' ? 'creates' : 'modifies';
+  return entries
+    .map(entry => {
+      const count = Number(entry[field]) || 0;
+      return {
+        ...entry,
+        count,
+        creates: action === 'create' ? count : 0,
+        modifies: action === 'modify' ? count : 0,
+      };
+    })
+    .filter(entry => entry.count > 0)
+    .sort((left, right) => right.count - left.count || String(left.key).localeCompare(String(right.key), 'ja'));
+}
+
+function initializeChartActionFilters() {
+  const chartIds = [
+    'prefecture-chart',
+    'category-chart',
+    'mapper-chart',
+    'daily-chart',
+    'changeset-chart',
+    'category-mapper-chart',
+  ];
+  chartIds.forEach(id => {
+    const canvas = document.querySelector(`#${id}`);
+    const heading = id === 'category-mapper-chart'
+      ? canvas?.closest('.category-mapper-ranking')?.querySelector('.category-mapper-actions')
+      : canvas?.closest('section')?.querySelector('.ranking-heading');
+    if (!heading) return;
+    let actions = heading;
+    if (heading.classList.contains('ranking-heading')) {
+      actions = document.createElement('div');
+      actions.className = 'chart-heading-actions';
+      const csvButton = heading.querySelector('.csv-icon-button');
+      if (csvButton) actions.append(csvButton);
+      heading.append(actions);
+    }
+    const select = document.createElement('select');
+    select.className = 'chart-action-filter';
+    select.dataset.chartAction = id;
+    select.setAttribute('aria-label', 'グラフの更新種別');
+    select.innerHTML = '<option value="both">新規・更新</option><option value="create">新規のみ</option><option value="modify">更新のみ</option>';
+    actions.prepend(select);
+    select.addEventListener('change', () => {
+      chartRenderers[id]?.();
+      chartCompanionRenderers[id]?.();
+      applyRankingFilters();
+    });
+  });
+}
+
 function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect) {
+  chartRenderers[id] = () => renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect);
   charts[id]?.destroy();
-  const top = entries.slice(0, 10);
-  const hasActionBreakdown = top.some(entry =>
+  const action = selectedChartAction(id);
+  const filteredEntries = filterChartEntries(entries, action);
+  const top = filteredEntries.slice(0, 10);
+  const hasActionBreakdown = entries.some(entry =>
     entry.creates !== undefined && entry.modifies !== undefined);
-  const datasets = hasActionBreakdown
+  const datasets = hasActionBreakdown && action === 'both'
     ? [
       {label: '新規', data: top.map(entry => entry.creates), backgroundColor: CREATE_COLOR},
       {label: '更新', data: top.map(entry => entry.modifies), backgroundColor: MODIFY_COLOR},
     ]
-    : [{label: datasetLabel, data: top.map(entry => entry.count), backgroundColor: '#1b8d70'}];
+    : [{
+      label: action === 'create' ? '新規' : action === 'modify' ? '更新' : datasetLabel,
+      data: top.map(entry => entry.count),
+      backgroundColor: action === 'create' ? CREATE_COLOR : action === 'modify' ? MODIFY_COLOR : '#1b8d70',
+    }];
   charts[id] = new Chart(document.querySelector(`#${id}`), {
     type: 'bar',
     data: {
@@ -320,8 +394,8 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect
       animation: false,
       plugins: {legend: {display: hasActionBreakdown}},
       scales: {
-        x: {stacked: hasActionBreakdown, beginAtZero: true, ticks: {precision: 0}},
-        y: {stacked: hasActionBreakdown},
+        x: {stacked: hasActionBreakdown && action === 'both', beginAtZero: true, ticks: {precision: 0}},
+        y: {stacked: hasActionBreakdown && action === 'both'},
       },
       onClick: onSelect ? (_event, elements) => {
         const index = elements[0]?.index;
@@ -332,16 +406,25 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect
 }
 
 function renderMapperChart(entries, id = 'mapper-chart') {
+  chartRenderers[id] = () => renderMapperChart(entries, id);
   charts[id]?.destroy();
-  const top = entries.slice(0, 10);
+  const action = selectedChartAction(id);
+  const top = filterChartEntries(entries, action).slice(0, 10);
+  const datasets = action === 'both'
+    ? [
+      {label: '新規', data: top.map(entry => entry.creates), backgroundColor: CREATE_COLOR},
+      {label: '更新', data: top.map(entry => entry.modifies), backgroundColor: MODIFY_COLOR},
+    ]
+    : [{
+      label: action === 'create' ? '新規' : '更新',
+      data: top.map(entry => entry.count),
+      backgroundColor: action === 'create' ? CREATE_COLOR : MODIFY_COLOR,
+    }];
   charts[id] = new Chart(document.querySelector(`#${id}`), {
     type: 'bar',
     data: {
       labels: top.map(entry => entry.row.editorName || '不明'),
-      datasets: [
-        {label: '新規', data: top.map(entry => entry.creates), backgroundColor: CREATE_COLOR},
-        {label: '更新', data: top.map(entry => entry.modifies), backgroundColor: MODIFY_COLOR},
-      ],
+      datasets,
     },
     options: {
       indexAxis: 'y',
@@ -349,8 +432,8 @@ function renderMapperChart(entries, id = 'mapper-chart') {
       maintainAspectRatio: false,
       animation: false,
       scales: {
-        x: {stacked: true, beginAtZero: true, ticks: {precision: 0}},
-        y: {stacked: true},
+        x: {stacked: action === 'both', beginAtZero: true, ticks: {precision: 0}},
+        y: {stacked: action === 'both'},
       },
     },
   });
@@ -380,6 +463,74 @@ function categoryTableRows(entries, total) {
     `<tr><td>${index + 1}</td><td>${escapeHtml(categoryName(entry.row))}<br><small>${escapeHtml(entry.key)}</small></td><td><button class="category-mapper-button" type="button" data-category-index="${index}">マッパーを見る</button></td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
 }
 
+function filteredChartTotal(entries) {
+  return entries.reduce((sum, entry) => sum + (Number(entry.count) || 0), 0);
+}
+
+function selectedCompanionTotal(chartId, entries, totals) {
+  const action = selectedChartAction(chartId);
+  return Number(totals?.[action]) || filteredChartTotal(entries);
+}
+
+function updatePrefectureCompanions(entries, totals) {
+  const filtered = filterChartEntries(entries, selectedChartAction('prefecture-chart'));
+  const total = selectedCompanionTotal('prefecture-chart', filtered, totals);
+  document.querySelector('#prefecture-table').innerHTML = filtered.map((entry, index) =>
+    `<tr><td>${index + 1}</td><td>${escapeHtml(entry.row.name)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`).join('');
+  setCsvList('prefectures', [
+    ['順位', '都道府県', '件数', '割合'],
+    ...filtered.map((entry, index) => [index + 1, entry.row.name, entry.count, percent(entry.count, total)]),
+  ]);
+}
+
+function updateCategoryCompanions(entries, totals) {
+  const allFiltered = filterChartEntries(entries, selectedChartAction('category-chart'));
+  const filtered = allFiltered.slice(0, 100);
+  const total = selectedCompanionTotal('category-chart', allFiltered, totals);
+  currentCategoryEntries = filtered;
+  document.querySelector('#category-table').innerHTML = categoryTableRows(filtered, total);
+  setCsvList('categories', [
+    ['順位', '代表タグ', 'タグ', '件数', '割合'],
+    ...filtered.map((entry, index) => [
+      index + 1, categoryName(entry.row), entry.key, entry.count, percent(entry.count, total),
+    ]),
+  ]);
+}
+
+function updateMapperCompanions(entries, key = 'mappers', chartId = 'mapper-chart', totals) {
+  const filtered = filterChartEntries(entries, selectedChartAction(chartId)).slice(0, 100);
+  const total = selectedCompanionTotal(chartId, filtered, totals);
+  document.querySelector(`#${key === 'mappers' ? 'mapper' : 'category-mapper'}-table`).innerHTML = mapperTableRows(filtered, total);
+  setCsvList(key, mapperCsvRows(filtered, total));
+}
+
+function updateDailyCompanions(rows) {
+  const action = selectedChartAction('daily-chart');
+  const filtered = rows.map(row => ({
+    ...row,
+    create: action === 'modify' ? 0 : row.create,
+    modify: action === 'create' ? 0 : row.modify,
+  }));
+  document.querySelector('#daily-table').innerHTML = filtered.map(row =>
+    `<tr><td>${escapeHtml(row.date.replace(/-/g, '/'))}</td><td>${number(row.create)}</td><td>${number(row.modify)}</td><td>${number(row.create + row.modify)}</td></tr>`).join('');
+  setCsvList('daily', [
+    ['日付', '新規', '更新', '合計'],
+    ...filtered.map(row => [row.date, row.create, row.modify, row.create + row.modify]),
+  ]);
+}
+
+function updateChangesetCompanions(entries) {
+  const filtered = filterChartEntries(entries, selectedChartAction('changeset-chart')).slice(0, 100);
+  document.querySelector('#changeset-table').innerHTML = filtered.map((entry, index) => {
+    const editor = entry.row.editorName || '不明';
+    return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
+  }).join('');
+  setCsvList('changesets', [
+    ['順位', '変更セット', 'マッパー', '件数'],
+    ...filtered.map((entry, index) => [index + 1, entry.key, entry.row.editorName || '不明', entry.count]),
+  ]);
+}
+
 function filterRankingRows(input) {
   const tableBody = document.querySelector(`#${input.dataset.filterTarget}`);
   if (!tableBody) return;
@@ -401,6 +552,8 @@ function resetCategoryMapperRanking() {
   document.querySelector('[data-filter-target="category-mapper-table"]').value = '';
   charts['category-mapper-chart']?.destroy();
   delete charts['category-mapper-chart'];
+  delete chartRenderers['category-mapper-chart'];
+  delete chartCompanionRenderers['category-mapper-chart'];
 }
 
 async function loadCategoryMapperRanking(entry) {
@@ -413,6 +566,8 @@ async function loadCategoryMapperRanking(entry) {
   document.querySelector('#category-mapper-table').innerHTML = '';
   charts['category-mapper-chart']?.destroy();
   delete charts['category-mapper-chart'];
+  delete chartRenderers['category-mapper-chart'];
+  delete chartCompanionRenderers['category-mapper-chart'];
   status.textContent = '集計中…';
   panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
 
@@ -433,8 +588,10 @@ async function loadCategoryMapperRanking(entry) {
 
     const mappers = mapperEntries(data.mappers || []);
     renderMapperChart(mappers, 'category-mapper-chart');
-    document.querySelector('#category-mapper-table').innerHTML = mapperTableRows(mappers, entry.count);
-    setCsvList('category-mappers', mapperCsvRows(mappers, entry.count));
+    const categoryTotals = {both: entry.count, create: entry.creates, modify: entry.modifies};
+    chartCompanionRenderers['category-mapper-chart'] = () =>
+      updateMapperCompanions(mappers, 'category-mappers', 'category-mapper-chart', categoryTotals);
+    chartCompanionRenderers['category-mapper-chart']();
     filterRankingRows(document.querySelector('[data-filter-target="category-mapper-table"]'));
     status.textContent = mappers.length ? `${number(mappers.length)}人（合計件数の上位100名）` : '該当するマッパーはいません。';
   } catch (error) {
@@ -463,21 +620,33 @@ function buildDailyRows(rows) {
 }
 
 function renderDailyChart(dailyRows) {
+  chartRenderers['daily-chart'] = () => renderDailyChart(dailyRows);
   charts['daily-chart']?.destroy();
+  const action = selectedChartAction('daily-chart');
+  const datasets = action === 'both'
+    ? [
+      {label: '新規', data: dailyRows.map(row => row.create), backgroundColor: CREATE_COLOR},
+      {label: '更新', data: dailyRows.map(row => row.modify), backgroundColor: MODIFY_COLOR},
+    ]
+    : [{
+      label: action === 'create' ? '新規' : '更新',
+      data: dailyRows.map(row => row[action]),
+      backgroundColor: action === 'create' ? CREATE_COLOR : MODIFY_COLOR,
+    }];
   charts['daily-chart'] = new Chart(document.querySelector('#daily-chart'), {
     type: 'bar',
     data: {
       labels: dailyRows.map(row => row.date.replace(/-/g, '/')),
-      datasets: [
-        {label: '新規', data: dailyRows.map(row => row.create), backgroundColor: CREATE_COLOR},
-        {label: '更新', data: dailyRows.map(row => row.modify), backgroundColor: MODIFY_COLOR},
-      ],
+      datasets,
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true, ticks: {precision: 0}}},
+      scales: {
+        x: {stacked: action === 'both'},
+        y: {stacked: action === 'both', beginAtZero: true, ticks: {precision: 0}},
+      },
     },
   });
 }
@@ -531,6 +700,15 @@ function render(rows) {
       index + 1, entry.key, entry.row.editorName || '不明', entry.count,
     ]),
   ]);
+  const reportTotals = {both: total, create: creates, modify: total - creates};
+  chartCompanionRenderers['category-chart'] = () => updateCategoryCompanions(categories, reportTotals);
+  chartCompanionRenderers['mapper-chart'] = () => updateMapperCompanions(mapperRows, 'mappers', 'mapper-chart', reportTotals);
+  chartCompanionRenderers['daily-chart'] = () => updateDailyCompanions(dailyRows);
+  chartCompanionRenderers['changeset-chart'] = () => updateChangesetCompanions(changesets);
+  chartCompanionRenderers['category-chart']();
+  chartCompanionRenderers['mapper-chart']();
+  chartCompanionRenderers['daily-chart']();
+  chartCompanionRenderers['changeset-chart']();
   applyRankingFilters();
 }
 
@@ -629,6 +807,17 @@ function renderNationwide(data) {
     ['日付', '新規', '更新', '合計'],
     ...dailyRows.map(row => [row.date, row.create, row.modify, row.create + row.modify]),
   ]);
+  const reportTotals = {both: total, create: creates, modify: modifies};
+  chartCompanionRenderers['prefecture-chart'] = () => updatePrefectureCompanions(prefectures, reportTotals);
+  chartCompanionRenderers['category-chart'] = () => updateCategoryCompanions(categories, reportTotals);
+  chartCompanionRenderers['mapper-chart'] = () => updateMapperCompanions(mappers, 'mappers', 'mapper-chart', reportTotals);
+  chartCompanionRenderers['daily-chart'] = () => updateDailyCompanions(dailyRows);
+  chartCompanionRenderers['changeset-chart'] = () => updateChangesetCompanions(changesets);
+  chartCompanionRenderers['prefecture-chart']();
+  chartCompanionRenderers['category-chart']();
+  chartCompanionRenderers['mapper-chart']();
+  chartCompanionRenderers['daily-chart']();
+  chartCompanionRenderers['changeset-chart']();
   applyRankingFilters();
 }
 async function loadReport() {
@@ -733,4 +922,5 @@ document.querySelectorAll('[data-csv-list]').forEach(button => {
     downloadCsv(`osm-${csvFileScope()}-${key}_${fromElement.value}_${toElement.value}.csv`, rows);
   });
 });
+initializeChartActionFilters();
 initialize().catch(error => { statusElement.textContent = `取得できませんでした: ${error.message}`; });

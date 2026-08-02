@@ -24,7 +24,7 @@
   <meta name="twitter:description" content="日本全国または都道府県を選び、OpenStreetMapで更新された地物を、代表タグ・編集者・日付・変更セット別に集計できます。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260731-9">
+  <link rel="stylesheet" href="style.css?v=20260802-35">
 </head>
 <body class="details-page">
   <header>
@@ -41,9 +41,10 @@
   </header>
   <main>
     <section class="prefecture-map-panel">
-      <div class="map-guide"><div class="map-guide-title"><strong>地図から都道府県を選択</strong><button id="show-nationwide" type="button" disabled>全国へ戻る</button></div><span>更新件数が多いほど薄い緑からオレンジへ変化します。クリックすると集計を更新します。</span><form id="filter" class="map-guide-dates"><label><span>期間</span><select id="days"><option value="7" selected>1週間</option><option value="14">2週間</option><option value="30">1ヵ月</option><option value="183">半年</option><option value="365">1年</option></select></label><label><input id="from" type="date" required aria-label="開始日"></label><span class="map-guide-date-separator" aria-hidden="true">〜</span><label><input id="to" type="date" required aria-label="終了日"></label></form></div>
+      <div class="map-guide"><div class="map-guide-title"><div class="map-guide-heading"><strong>地域集計</strong><span id="details-summary-prefecture">全国</span></div></div><form id="filter" class="map-guide-dates"><label><span>期間</span><select id="days"><option value="7" selected>1週間</option><option value="14">2週間</option><option value="30">1ヵ月</option><option value="183">半年</option><option value="365">1年</option></select></label><label><input id="from" type="date" required aria-label="開始日"></label><span class="map-guide-date-separator" aria-hidden="true">〜</span><label><input id="to" type="date" required aria-label="終了日"></label></form></div>
       <p id="status" class="map-status">データを読み込んでいます…</p>
       <div id="prefecture-map" aria-label="都道府県選択地図"></div>
+      <button id="show-nationwide" type="button" disabled>全国へ戻る</button>
     </section>
     <div class="report-heading"><div><div class="report-title-row"><h2 id="report-title">日本全国の更新地物集計</h2></div><p id="period"></p></div></div>
     <section class="summary" aria-label="集計概要">
@@ -63,6 +64,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
   <script src="help.js?v=20260731-1"></script>
   <script src="map-view.js"></script>
-  <script src="details.js"></script>
+  <script src="details.js?v=20260802-4"></script>
 </body>
 </html>
