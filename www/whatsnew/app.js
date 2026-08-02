@@ -1,7 +1,11 @@
 const mapPageUrl = new URL(window.location.href);
+const WIDE_MAP_BOUNDS = [[115, 4], [146, 46]];
+const MAP_MOVEMENT_BOUNDS = [[110, 2], [158, 60]];
+const WIDE_MAP_CENTER = [130.5, 25];
+const WIDE_MAP_ZOOM = 3.15;
 const initialMapView = window.osmSharedMapView.read({
-  fallbackCenter: [137.2, 36.2],
-  fallbackZoom: 4.15,
+  fallbackCenter: WIDE_MAP_CENTER,
+  fallbackZoom: WIDE_MAP_ZOOM,
   minZoom: 2,
   maxZoom: 22,
 });
@@ -42,7 +46,7 @@ const map = new maplibregl.Map({
   center: [initialLongitude, initialLatitude],
   zoom: initialZoom,
   minZoom: 2,
-  maxBounds: [[118, 18], [158, 60]],
+  maxBounds: MAP_MOVEMENT_BOUNDS,
   pitchWithRotate: true,
   touchPitch: true,
   fadeDuration: 0,
@@ -53,11 +57,16 @@ window.osmSharedMapView.bind(map);
 
 
 const status = document.querySelector('#status');
+const mapPageMain = document.querySelector('.map-page main');
+const listPanel = document.querySelector('.map-page aside');
+const listResizeHandle = document.querySelector('#list-resize-handle');
 const list = document.querySelector('#list');
 const listScroller = list;
 const poiTypeSelect = document.querySelector('#poi-type');
 const timeline = document.querySelector('#timeline');
 const range = document.querySelector('#time-range');
+const timelineRangeRow = document.querySelector('.timeline-range-row');
+const timelineResetButton = document.querySelector('#timeline-reset');
 const timelineSummaryPrefecture = document.querySelector('#timeline-summary-prefecture');
 const timelineSummaryDatetime = document.querySelector('#timeline-summary-datetime');
 const timelineSummaryCount = document.querySelector('#timeline-summary-count');
@@ -77,12 +86,149 @@ const prefectureFilterReset = document.querySelector('#prefecture-filter-reset')
 const shareButton = document.querySelector('#share-view');
 const downloadButton = document.querySelector('#download-data');
 const downloadCsvButton = document.querySelector('#download-csv');
+const demoModeButton = document.querySelector('#demo-mode');
+const demoExitButton = document.querySelector('#demo-exit');
+const demoDetailsButton = document.querySelector('#demo-details');
+const demoTimescale = document.querySelector('#demo-timescale');
+const demoYear = document.querySelector('#demo-year');
+const demoPlaybackControls = document.querySelector('#demo-playback-controls');
+const demoRulerViewport = document.querySelector('.demo-ruler-viewport');
+const demoRulerTrack = document.querySelector('#demo-ruler-track');
 const mobilePrefectureFilterMedia = window.matchMedia('(max-width: 700px) and (max-aspect-ratio: 1/1)');
 const guide = window.osmWhatsNewGuide;
 const guideDialog = guide?.dialog;
 
+function updateSummaryPlayButton(playing, demo = false) {
+  const action = playing ? '停止' : '再生';
+  summaryPlayButton.classList.toggle('is-playing', playing);
+  summaryPlayButton.setAttribute('aria-label', `${demo ? '星空デモ' : 'タイムライン'}を${action}`);
+  summaryPlayButton.title = action;
+}
+
 const shareStatus = document.querySelector('#share-status');
 if (requestedStepValue) timelineStep.value = requestedStepValue;
+
+const LIST_WIDTH_STORAGE_KEY = 'osm-whatsnew-list-width-v1';
+const LIST_HEIGHT_STORAGE_KEY = 'osm-whatsnew-list-height-v1';
+let listResizeFrame = null;
+
+function listWidthLimits() {
+  const styles = getComputedStyle(mapPageMain);
+  const available = mapPageMain.clientWidth
+    - parseFloat(styles.paddingLeft)
+    - parseFloat(styles.paddingRight);
+  return {minimum: 280, maximum: Math.max(280, Math.min(620, available - 360))};
+}
+
+function setListWidth(width, persist = false) {
+  const {minimum, maximum} = listWidthLimits();
+  const bounded = Math.round(Math.min(maximum, Math.max(minimum, Number(width) || 430)));
+  mapPageMain.style.setProperty('--list-width', `${bounded}px`);
+  listResizeHandle.setAttribute('aria-valuemin', String(minimum));
+  listResizeHandle.setAttribute('aria-valuemax', String(maximum));
+  listResizeHandle.setAttribute('aria-valuenow', String(bounded));
+  if (persist) {
+    try { localStorage.setItem(LIST_WIDTH_STORAGE_KEY, String(bounded)); } catch { /* Storage may be unavailable. */ }
+  }
+  if (listResizeFrame !== null) cancelAnimationFrame(listResizeFrame);
+  listResizeFrame = requestAnimationFrame(() => {
+    listResizeFrame = null;
+    map.resize();
+  });
+}
+
+function listHeightLimits() {
+  return {minimum: 180, maximum: Math.max(180, mapPageMain.clientHeight - 240)};
+}
+
+function setListHeight(height, persist = false) {
+  const {minimum, maximum} = listHeightLimits();
+  const bounded = Math.round(Math.min(maximum, Math.max(minimum, Number(height) || mapPageMain.clientHeight * 0.38)));
+  mapPageMain.style.setProperty('--list-height', `${bounded}px`);
+  listResizeHandle.setAttribute('aria-valuemin', String(minimum));
+  listResizeHandle.setAttribute('aria-valuemax', String(maximum));
+  listResizeHandle.setAttribute('aria-valuenow', String(bounded));
+  if (persist) {
+    try { localStorage.setItem(LIST_HEIGHT_STORAGE_KEY, String(bounded)); } catch { /* Storage may be unavailable. */ }
+  }
+  if (listResizeFrame !== null) cancelAnimationFrame(listResizeFrame);
+  listResizeFrame = requestAnimationFrame(() => {
+    listResizeFrame = null;
+    map.resize();
+  });
+}
+
+function listResizeIsVertical() {
+  return getComputedStyle(listResizeHandle).cursor === 'col-resize';
+}
+
+function updateListResizeOrientation() {
+  listResizeHandle.setAttribute('aria-orientation', listResizeIsVertical() ? 'vertical' : 'horizontal');
+}
+
+let initialListWidth = 430;
+try {
+  const storedListWidth = Number(localStorage.getItem(LIST_WIDTH_STORAGE_KEY));
+  if (Number.isFinite(storedListWidth) && storedListWidth > 0) initialListWidth = storedListWidth;
+} catch {
+  // Storage may be unavailable in private or restricted browsing contexts.
+}
+setListWidth(initialListWidth);
+try {
+  const storedListHeight = Number(localStorage.getItem(LIST_HEIGHT_STORAGE_KEY));
+  if (Number.isFinite(storedListHeight) && storedListHeight > 0) setListHeight(storedListHeight);
+} catch {
+  // Storage may be unavailable in private or restricted browsing contexts.
+}
+updateListResizeOrientation();
+
+listResizeHandle.addEventListener('pointerdown', event => {
+  if (getComputedStyle(listResizeHandle).display === 'none') return;
+  event.preventDefault();
+  listResizeHandle.setPointerCapture(event.pointerId);
+  document.body.classList.add('is-resizing-list');
+  document.body.style.cursor = getComputedStyle(listResizeHandle).cursor;
+});
+listResizeHandle.addEventListener('pointermove', event => {
+  if (!listResizeHandle.hasPointerCapture(event.pointerId)) return;
+  const mainRect = mapPageMain.getBoundingClientRect();
+  if (listResizeIsVertical()) {
+    const rightPadding = parseFloat(getComputedStyle(mapPageMain).paddingRight);
+    setListWidth(mainRect.right - rightPadding - event.clientX);
+  } else {
+    setListHeight(mainRect.bottom - event.clientY);
+  }
+});
+const finishListResize = event => {
+  if (!listResizeHandle.hasPointerCapture(event.pointerId)) return;
+  listResizeHandle.releasePointerCapture(event.pointerId);
+  document.body.classList.remove('is-resizing-list');
+  document.body.style.cursor = '';
+  if (listResizeIsVertical()) setListWidth(parseFloat(getComputedStyle(listPanel).width), true);
+  else setListHeight(parseFloat(getComputedStyle(listPanel).height), true);
+};
+listResizeHandle.addEventListener('pointerup', finishListResize);
+listResizeHandle.addEventListener('pointercancel', finishListResize);
+listResizeHandle.addEventListener('keydown', event => {
+  const vertical = listResizeIsVertical();
+  const accepted = vertical
+    ? event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+    : event.key === 'ArrowUp' || event.key === 'ArrowDown';
+  if (!accepted) return;
+  event.preventDefault();
+  if (vertical) {
+    const direction = event.key === 'ArrowLeft' ? 1 : -1;
+    setListWidth(parseFloat(getComputedStyle(listPanel).width) + direction * 20, true);
+  } else {
+    const direction = event.key === 'ArrowUp' ? 1 : -1;
+    setListHeight(parseFloat(getComputedStyle(listPanel).height) + direction * 20, true);
+  }
+});
+window.addEventListener('resize', () => {
+  updateListResizeOrientation();
+  if (listResizeIsVertical()) setListWidth(parseFloat(getComputedStyle(listPanel).width));
+  else setListHeight(parseFloat(getComputedStyle(listPanel).height));
+});
 
 let markerEntries = [];
 let poiFeatures = [];
@@ -150,22 +296,390 @@ let resumePlaybackAfterGuide = false;
 let automaticPlaybackPending = false;
 let apiUrl = '';
 let configurationPromise = null;
+let demoAnimationFrame = null;
+let demoCanvas = null;
+let demoContext = null;
+let demoView = null;
+let demoStartedAt = 0;
+let demoPaused = false;
+let demoPausedElapsed = 0;
+let demoLastPaintAt = 0;
+let demoLastTimeUpdateAt = 0;
+let demoRulerStart = 0;
+let demoRulerStep = 0;
+let demoRulerDrag = null;
+let demoTimelineDetailsWasExpanded = false;
+let demoLayerVisibilities = new Map();
+let demoSampleSource = null;
+let demoSampleSourceLength = 0;
+let demoSampleLimit = 0;
+let demoSampledFeatures = [];
+const DEMO_MOBILE_MAX_STARS = 2000;
+const DEMO_DESKTOP_MAX_STARS = 4000;
+const DEMO_STAR_CLUSTER_SIZE = 8;
+const DEMO_FRAME_INTERVAL = 1000 / 30;
+const DEMO_STEP_DURATION = 250;
+const DEMO_MIN_REVEAL_DURATION = 3000;
+const DEMO_MAX_REVEAL_DURATION = 120000;
+const DEMO_END_HOLD_DURATION = 1000;
+const DEMO_HIDDEN_LAYERS = [
+  POI_HIGHLIGHT_LAYER,
+  POI_LAYER,
+  CLUSTER_CIRCLE_LAYER,
+  CLUSTER_COUNT_LAYER,
+  CLUSTER_POINT_LAYER,
+];
+const DEMO_RULER_TICK_WIDTH = 64;
+const DEMO_RULER_STEP = 8 * 60 * 60 * 1000;
+const JST_OFFSET = 9 * 60 * 60 * 1000;
+const demoYearFormatter = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+});
+const demoMonthDayFormatter = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  day: 'numeric',
+});
+const demoTimeFormatter = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+function demoRevealDuration() {
+  const span = Number(range.max) - Number(range.min);
+  if (!Number.isFinite(span) || span <= 0 || !Number.isFinite(timeStep) || timeStep <= 0) {
+    return 12000;
+  }
+  const duration = (span / timeStep) * DEMO_STEP_DURATION;
+  return Math.min(DEMO_MAX_REVEAL_DURATION, Math.max(DEMO_MIN_REVEAL_DURATION, duration));
+}
+
+function demoCycleDuration(revealDuration = demoRevealDuration()) {
+  return revealDuration + DEMO_END_HOLD_DURATION;
+}
+
+function setupDemoRuler() {
+  const minimum = Number(range.min);
+  const maximum = Number(range.max);
+  if (!Number.isFinite(minimum) || !Number.isFinite(maximum) || maximum <= minimum) return;
+  demoRulerStep = DEMO_RULER_STEP;
+  demoRulerStart = Math.floor((minimum + JST_OFFSET) / demoRulerStep) * demoRulerStep - JST_OFFSET;
+  const tickCount = Math.ceil((maximum - demoRulerStart) / demoRulerStep) + 2;
+  const fragment = document.createDocumentFragment();
+  for (let index = 0; index < tickCount; index++) {
+    const tickTime = demoRulerStart + index * demoRulerStep;
+    const tick = document.createElement('span');
+    tick.className = 'demo-ruler-tick';
+    const date = new Date(tickTime);
+    const dateLabel = demoMonthDayFormatter.format(date);
+    const timeLabel = demoTimeFormatter.format(date);
+    const isDayChange = (tickTime + JST_OFFSET) % (24 * 60 * 60 * 1000) === 0;
+    if (isDayChange) {
+      tick.classList.add('is-day-change');
+      tick.textContent = `${dateLabel}\n${timeLabel}`;
+    } else {
+      tick.textContent = timeLabel;
+    }
+    fragment.append(tick);
+  }
+  demoRulerTrack.replaceChildren(fragment);
+}
+
+function updateDemoTime(time, now) {
+  range.value = String(time);
+  if (now - demoLastTimeUpdateAt < 200) return;
+  demoLastTimeUpdateAt = now;
+  if (!Number.isFinite(time)) return;
+  const date = new Date(time);
+  timelineSummaryDatetime.textContent = fmtTimelineSummary(time);
+  timelineSummaryDatetime.dateTime = date.toISOString();
+  timelineSummaryDatetime.title = fmt(time);
+  const yearMonthParts = Object.fromEntries(
+    demoYearFormatter.formatToParts(date).map(part => [part.type, part.value]),
+  );
+  demoYear.textContent = `${yearMonthParts.year}/${yearMonthParts.month}`;
+  if (demoRulerStep > 0) {
+    const tickPosition = ((time - demoRulerStart) / demoRulerStep) * DEMO_RULER_TICK_WIDTH;
+    const markerPosition = demoRulerViewport.clientWidth * (window.innerWidth <= 700 ? 0.32 : 0.24);
+    demoRulerTrack.style.transform = `translate3d(${markerPosition - tickPosition}px,0,0)`;
+  }
+}
+
+function seekDemoRuler(time, updateFeatures = false) {
+  const minimum = Number(range.min);
+  const maximum = Number(range.max);
+  const clampedTime = Math.min(maximum, Math.max(minimum, time));
+  const progress = (clampedTime - minimum) / (maximum - minimum);
+  range.value = String(clampedTime);
+  demoPausedElapsed = Math.min(1, Math.max(0, progress)) * demoRevealDuration();
+  demoLastTimeUpdateAt = -Infinity;
+  updateDemoTime(clampedTime, performance.now());
+  if (updateFeatures) updateHighlight();
+}
+
+demoRulerViewport.addEventListener('pointerdown', event => {
+  if (!demoCanvas || !demoRulerStep) return;
+  pauseDemoPlayback();
+  demoRulerDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startTime: Number(range.value),
+    pendingTime: Number(range.value),
+    animationFrame: null,
+  };
+  demoRulerViewport.classList.add('is-dragging');
+  demoRulerViewport.setPointerCapture(event.pointerId);
+  event.preventDefault();
+});
+
+demoRulerViewport.addEventListener('pointermove', event => {
+  if (!demoRulerDrag || event.pointerId !== demoRulerDrag.pointerId) return;
+  const timeDelta = -(event.clientX - demoRulerDrag.startX)
+    / DEMO_RULER_TICK_WIDTH * demoRulerStep;
+  demoRulerDrag.pendingTime = demoRulerDrag.startTime + timeDelta;
+  if (demoRulerDrag.animationFrame !== null) return;
+  const drag = demoRulerDrag;
+  drag.animationFrame = requestAnimationFrame(() => {
+    drag.animationFrame = null;
+    if (demoRulerDrag === drag) seekDemoRuler(drag.pendingTime);
+  });
+});
+
+function finishDemoRulerDrag(event) {
+  if (!demoRulerDrag || event.pointerId !== demoRulerDrag.pointerId) return;
+  if (demoRulerDrag.animationFrame !== null) cancelAnimationFrame(demoRulerDrag.animationFrame);
+  seekDemoRuler(demoRulerDrag.pendingTime, true);
+  demoRulerDrag = null;
+  demoRulerViewport.classList.remove('is-dragging');
+}
+
+demoRulerViewport.addEventListener('pointerup', finishDemoRulerDrag);
+demoRulerViewport.addEventListener('pointercancel', finishDemoRulerDrag);
+
+function demoVisibleFeatureCount(features, time) {
+  let low = 0;
+  let high = features.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (Number(features[middle]?.properties?.timestamp) <= time) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+function pauseDemoPlayback() {
+  if (!demoCanvas || demoPaused) return;
+  demoPausedElapsed = (performance.now() - demoStartedAt) % demoCycleDuration();
+  demoPaused = true;
+  updateSummaryPlayButton(false, true);
+}
+
+function playDemoPlayback() {
+  if (!demoCanvas || !demoPaused) return;
+  demoStartedAt = performance.now() - demoPausedElapsed;
+  demoPaused = false;
+  updateSummaryPlayButton(true, true);
+}
+
+function demoStarFeatures() {
+  const maximum = window.innerWidth <= 700 ? DEMO_MOBILE_MAX_STARS : DEMO_DESKTOP_MAX_STARS;
+  if (poiFeatures.length <= maximum) return poiFeatures;
+  if (demoSampleSource !== poiFeatures
+    || demoSampleSourceLength !== poiFeatures.length
+    || demoSampleLimit !== maximum) {
+    const stride = poiFeatures.length / maximum;
+    demoSampledFeatures = Array.from({length: maximum}, (_, index) => poiFeatures[Math.floor(index * stride)]);
+    demoSampleSource = poiFeatures;
+    demoSampleSourceLength = poiFeatures.length;
+    demoSampleLimit = maximum;
+  }
+  return demoSampledFeatures;
+}
+
+function resizeDemoCanvas() {
+  if (!demoCanvas || !demoContext) return;
+  const width = map.getContainer().clientWidth;
+  const height = map.getContainer().clientHeight;
+  const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+  if (demoCanvas.width !== Math.round(width * ratio) || demoCanvas.height !== Math.round(height * ratio)) {
+    demoCanvas.width = Math.round(width * ratio);
+    demoCanvas.height = Math.round(height * ratio);
+    demoCanvas.style.width = `${width}px`;
+    demoCanvas.style.height = `${height}px`;
+    demoContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+  }
+}
+
+function paintDemoStars(now) {
+  if (!demoCanvas || !demoContext) return;
+  demoAnimationFrame = requestAnimationFrame(paintDemoStars);
+  if (now - demoLastPaintAt < DEMO_FRAME_INTERVAL) return;
+  demoLastPaintAt = now;
+  resizeDemoCanvas();
+  const width = map.getContainer().clientWidth;
+  const height = map.getContainer().clientHeight;
+  demoContext.clearRect(0, 0, width, height);
+  const elapsed = (now - demoStartedAt) / 1000;
+  const features = demoStarFeatures();
+  const minimum = Number(range.min);
+  const maximum = Number(range.max);
+  const revealDuration = demoRevealDuration();
+  const cycleElapsed = demoPaused
+    ? demoPausedElapsed
+    : (now - demoStartedAt) % demoCycleDuration(revealDuration);
+  const cycleProgress = Math.min(1, cycleElapsed / revealDuration);
+  const currentTime = minimum + (maximum - minimum) * cycleProgress;
+  const visibleCount = demoVisibleFeatureCount(features, currentTime);
+  updateDemoTime(currentTime, now);
+  const clusters = new Map();
+  for (let index = 0; index < visibleCount; index++) {
+    const feature = features[index];
+    const point = map.project(feature.geometry.coordinates);
+    if (point.x < -12 || point.y < -12 || point.x > width + 12 || point.y > height + 12) continue;
+    const cellX = Math.round(point.x / DEMO_STAR_CLUSTER_SIZE);
+    const cellY = Math.round(point.y / DEMO_STAR_CLUSTER_SIZE);
+    const key = `${cellX}:${cellY}`;
+    const action = feature.properties.action === 'create' ? 'create' : 'modify';
+    const cluster = clusters.get(key);
+    if (cluster) {
+      cluster.count++;
+      cluster.x += (point.x - cluster.x) / cluster.count;
+      cluster.y += (point.y - cluster.y) / cluster.count;
+      cluster[action]++;
+    } else {
+      clusters.set(key, {
+        x: point.x,
+        y: point.y,
+        count: 1,
+        create: action === 'create' ? 1 : 0,
+        modify: action === 'modify' ? 1 : 0,
+        seed: Math.abs((cellX * 73856093 ^ cellY * 19349663) % 1000) / 1000,
+      });
+    }
+  }
+  for (const cluster of clusters.values()) {
+    const seed = cluster.seed;
+    const wave = (Math.sin(elapsed * (1.4 + seed * 2.2) + seed * Math.PI * 2) + 1) / 2;
+    const flare = Math.pow(wave, 6);
+    const countBoost = Math.min(2.2, Math.log2(cluster.count + 1) * 0.45);
+    const radius = 1 + wave * 1.4 + countBoost;
+    const color = cluster.create >= cluster.modify ? '137,255,217' : '255,190,126';
+    if (flare > 0.12) {
+      demoContext.beginPath();
+      demoContext.arc(cluster.x, cluster.y, radius + flare * (4 + countBoost), 0, Math.PI * 2);
+      demoContext.fillStyle = `rgba(${color},${Math.min(0.28, flare * (0.18 + countBoost * 0.025))})`;
+      demoContext.fill();
+    }
+    demoContext.beginPath();
+    demoContext.arc(cluster.x, cluster.y, radius, 0, Math.PI * 2);
+    demoContext.fillStyle = `rgba(${color},${0.35 + wave * 0.65})`;
+    demoContext.fill();
+  }
+}
+
+function setDemoLayerVisibility(hidden) {
+  DEMO_HIDDEN_LAYERS.forEach(layerId => {
+    if (!map.getLayer(layerId)) return;
+    if (hidden) {
+      demoLayerVisibilities.set(layerId, map.getLayoutProperty(layerId, 'visibility') || 'visible');
+      map.setLayoutProperty(layerId, 'visibility', 'none');
+    } else {
+      map.setLayoutProperty(layerId, 'visibility', demoLayerVisibilities.get(layerId) || 'visible');
+    }
+  });
+  if (!hidden) demoLayerVisibilities.clear();
+}
+
+function stopDemoMode({restoreView = true} = {}) {
+  if (!demoCanvas) return;
+  cancelAnimationFrame(demoAnimationFrame);
+  demoAnimationFrame = null;
+  demoCanvas.remove();
+  demoCanvas = null;
+  demoContext = null;
+  setDemoLayerVisibility(false);
+  document.body.classList.remove('is-demo-mode');
+  document.body.classList.remove('is-demo-details-open');
+  demoModeButton.setAttribute('aria-pressed', 'false');
+  demoModeButton.textContent = 'デモ';
+  updateSummaryPlayButton(false);
+  demoExitButton.hidden = true;
+  demoDetailsButton.hidden = true;
+  demoDetailsButton.setAttribute('aria-expanded', 'false');
+  demoDetailsButton.textContent = '詳細';
+  timelineToggle.setAttribute('aria-expanded', String(demoTimelineDetailsWasExpanded));
+  timelineToggle.textContent = demoTimelineDetailsWasExpanded ? '閉じる' : '詳細';
+  timelineDetails.hidden = !demoTimelineDetailsWasExpanded;
+  demoTimescale.hidden = true;
+  demoYear.textContent = '';
+  demoRulerTrack.replaceChildren();
+  demoRulerTrack.style.transform = '';
+  demoRulerStep = 0;
+  if (demoRulerDrag?.animationFrame != null) cancelAnimationFrame(demoRulerDrag.animationFrame);
+  demoRulerDrag = null;
+  demoRulerViewport.classList.remove('is-dragging');
+  timelineRangeRow.append(timelineResetButton, summaryPlayButton);
+  map.resize();
+  if (restoreView && demoView) map.easeTo({...demoView, duration: 700});
+  demoView = null;
+}
+
+function startDemoMode() {
+  if (!poiFeatures.length || demoCanvas) return;
+  automaticPlaybackPending = false;
+  pauseTimeline();
+  osmPopup.remove();
+  demoView = {center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch()};
+  demoTimelineDetailsWasExpanded = timelineToggle.getAttribute('aria-expanded') === 'true';
+  demoCanvas = document.createElement('canvas');
+  demoCanvas.className = 'demo-stars-canvas';
+  demoCanvas.setAttribute('aria-hidden', 'true');
+  map.getContainer().append(demoCanvas);
+  demoContext = demoCanvas.getContext('2d');
+  setDemoLayerVisibility(true);
+  document.body.classList.add('is-demo-mode');
+  demoModeButton.setAttribute('aria-pressed', 'true');
+  demoModeButton.textContent = 'デモ終了';
+  demoExitButton.hidden = false;
+  demoDetailsButton.hidden = false;
+  demoTimescale.hidden = false;
+  demoPlaybackControls.append(timelineResetButton, summaryPlayButton);
+  setupDemoRuler();
+  map.resize();
+  demoStartedAt = performance.now();
+  demoPaused = false;
+  demoPausedElapsed = 0;
+  updateSummaryPlayButton(true, true);
+  demoLastPaintAt = 0;
+  demoLastTimeUpdateAt = -Infinity;
+  const mapContainer = map.getContainer();
+  map.fitBounds(WIDE_MAP_BOUNDS, {
+    padding: 36,
+    offset: [-mapContainer.clientWidth * 0.12, mapContainer.clientHeight * 0.12],
+    pitch: 0,
+    bearing: 0,
+    duration: 900,
+  });
+  demoAnimationFrame = requestAnimationFrame(paintDemoStars);
+}
 
 function setPrefectureFilterExpanded(expanded) {
   prefectureFilterToggle.setAttribute('aria-expanded', String(expanded));
+  prefectureFilterToggle.textContent = expanded ? '地図に戻る' : '地域選択';
   prefectureFilter.hidden = !expanded;
-  document.body.classList.toggle('is-mobile-prefecture-selecting', expanded && mobilePrefectureFilterMedia.matches);
-  renderVirtualList(true);
+  document.body.classList.toggle('is-prefecture-selecting', expanded);
   if (expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
 }
 
-function closeMobilePrefectureFilter() {
-  if (mobilePrefectureFilterMedia.matches) setPrefectureFilterExpanded(false);
+function closePrefectureFilter() {
+  setPrefectureFilterExpanded(false);
 }
 
 mobilePrefectureFilterMedia.addEventListener('change', () => {
   const expanded = prefectureFilterToggle.getAttribute('aria-expanded') === 'true';
-  document.body.classList.toggle('is-mobile-prefecture-selecting', expanded && mobilePrefectureFilterMedia.matches);
   if (expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
 });
 
@@ -648,7 +1162,7 @@ async function initializePrefectureMiniMap() {
       if (!name) return;
       selectedPrefecture = name;
       updatePrefectureMiniMapSelection();
-      closeMobilePrefectureFilter();
+      closePrefectureFilter();
       const box = prefectureBounds(selectedPrefectureFeature());
       map.fitBounds([[box[0], box[1]], [box[2], box[3]]], {padding: 42, duration: 350, maxZoom: 9});
       resetSharedTimelineTime();
@@ -666,7 +1180,7 @@ async function initializePrefectureMiniMap() {
 
 async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '', signal) {
   const pageSize = 5000;
-  const maximumRequests = 10;
+  const maximumRequests = 20;
   const rows = [];
   let cursor = '';
   for (let request = 1; request <= maximumRequests; request++) {
@@ -686,7 +1200,7 @@ async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '', 
     cursor = String(data.meta?.nextCursor || '');
     if (!cursor) return rows;
   }
-  status.textContent = '表示上限の50,000件まで読み込みました。';
+  status.textContent = '表示上限の100,000件まで読み込みました。';
   return rows;
 }
 
@@ -760,8 +1274,10 @@ function decorateItem(item) {
   };
 }
 
-function clearMarkers() {
+function clearMarkers({preserveDemo = false} = {}) {
+  if (!preserveDemo) stopDemoMode({restoreView: false});
   pauseTimeline();
+  if (preserveDemo) updateSummaryPlayButton(!demoPaused, true);
   osmPopup.remove();
   activeListItem = null;
   activeListEntryIndex = -1;
@@ -776,6 +1292,8 @@ function clearMarkers() {
   updateTimelineSummary();
   downloadButton.disabled = true;
   downloadCsvButton.disabled = true;
+  demoModeButton.disabled = true;
+  timelineResetButton.disabled = true;
   visibleListCount = 0;
   clusterVisibleCount = -1;
   highlightedListStart = 0;
@@ -802,8 +1320,7 @@ function pauseTimeline() {
     cancelAnimationFrame(playbackFrame);
     playbackFrame = null;
   }
-  summaryPlayButton.textContent = '再生';
-  summaryPlayButton.setAttribute('aria-label', 'タイムラインを再生');
+  updateSummaryPlayButton(false);
 }
 
 function animateRange(from, to, duration, done) {
@@ -865,8 +1382,7 @@ function playTimeline() {
   pauseTimeline();
   if (Number(range.value) >= Number(range.max)) range.value = range.min;
   isPlaying = true;
-  summaryPlayButton.textContent = '停止';
-  summaryPlayButton.setAttribute('aria-label', 'タイムラインを停止');
+  updateSummaryPlayButton(true);
   updateHighlight();
   playNextStep();
 }
@@ -1272,6 +1788,12 @@ function setupTimeline(items) {
   timeEnd.textContent = fmt(max);
   // Keep the timeline hidden until the POI source has finished rendering.
   range.disabled = false;
+  if (demoCanvas) {
+    setupDemoRuler();
+    demoStartedAt = performance.now();
+    demoPausedElapsed = 0;
+    demoLastTimeUpdateAt = -Infinity;
+  }
   updateHighlight();
   return restoredSharedTime;
 }
@@ -1434,7 +1956,7 @@ function waitForPoiSourceReady() {
 
 async function show(items) {
   const currentRender = ++renderVersion;
-  clearMarkers();
+  clearMarkers({preserveDemo: Boolean(demoCanvas)});
   status.hidden = false;
 
   const ordered = [...items].sort((a, b) => parseUtcDate(a.date) - parseUtcDate(b.date));
@@ -1506,11 +2028,14 @@ async function show(items) {
   status.hidden = true;
   downloadButton.disabled = false;
   downloadCsvButton.disabled = false;
+  demoModeButton.disabled = false;
+  timelineResetButton.disabled = false;
   timeline.hidden = false;
-  requestAutomaticPlayback();
+  if (!demoCanvas) requestAutomaticPlayback();
 }
 async function load() {
   const currentLoad = ++loadVersion;
+  const preserveDemo = Boolean(demoCanvas);
   if (activeLoadController) activeLoadController.abort();
   const controller = new AbortController();
   activeLoadController = controller;
@@ -1519,7 +2044,7 @@ async function load() {
   status.textContent = '保存済みデータを読み込み中…';
   poiTypeSelect.disabled = true;
   timeline.hidden = true;
-  clearMarkers();
+  clearMarkers({preserveDemo});
   try {
     if (!dateFrom.value || !dateTo.value || dateFrom.value > dateTo.value) {
       throw new Error('開始日と終了日を正しく選択してください。');
@@ -1552,17 +2077,47 @@ async function load() {
   }
 }
 range.addEventListener('input', () => {
-  pauseTimeline();
+  if (demoCanvas) {
+    pauseDemoPlayback();
+    const minimum = Number(range.min);
+    const maximum = Number(range.max);
+    const progress = (Number(range.value) - minimum) / (maximum - minimum);
+    if (Number.isFinite(progress)) {
+      demoPausedElapsed = Math.min(1, Math.max(0, progress)) * demoRevealDuration();
+      demoLastTimeUpdateAt = -Infinity;
+    }
+  } else {
+    pauseTimeline();
+  }
   updateHighlight();
 });
 range.addEventListener('change', () => {
   const minimum = Number(range.min);
   const snapped = minimum + Math.round((Number(range.value) - minimum) / timeStep) * timeStep;
   range.value = String(Math.min(Number(range.max), Math.max(minimum, snapped)));
+  if (demoCanvas) {
+    const progress = (Number(range.value) - minimum) / (Number(range.max) - minimum);
+    demoPausedElapsed = Math.min(1, Math.max(0, progress)) * demoRevealDuration();
+    demoLastTimeUpdateAt = -Infinity;
+  }
+  updateHighlight();
+});
+timelineResetButton.addEventListener('click', () => {
+  if (demoCanvas) {
+    pauseDemoPlayback();
+    demoPausedElapsed = 0;
+    demoLastTimeUpdateAt = -Infinity;
+  } else {
+    pauseTimeline();
+  }
+  range.value = range.min;
   updateHighlight();
 });
 summaryPlayButton.addEventListener('click', () => {
-  if (isPlaying) pauseTimeline();
+  if (demoCanvas) {
+    if (demoPaused) playDemoPlayback();
+    else pauseDemoPlayback();
+  } else if (isPlaying) pauseTimeline();
   else playTimeline();
 });
 prefectureFilterToggle.addEventListener('click', () => {
@@ -1576,7 +2131,9 @@ timelineToggle.addEventListener('click', () => {
   timelineDetails.hidden = !expanded;
 });
 timelineStep.addEventListener('change', () => {
-  pauseTimeline();
+  const demoWasPlaying = Boolean(demoCanvas && !demoPaused);
+  const timelineWasPlaying = !demoCanvas && isPlaying;
+  if (!demoCanvas) pauseTimeline();
   timeStep = Number(timelineStep.value);
   highlightRadius = timeStep;
   if (!markerEntries.length) {
@@ -1594,7 +2151,15 @@ timelineStep.addEventListener('change', () => {
   range.value = String(Math.min(Number(range.max), Math.max(minimum, current)));
   timeStart.textContent = fmt(minimum);
   timeEnd.textContent = fmt(maximum);
+  if (demoCanvas) {
+    const progress = (Number(range.value) - minimum) / (Number(range.max) - minimum);
+    demoPausedElapsed = Math.min(1, Math.max(0, progress)) * demoRevealDuration();
+    if (demoWasPlaying) demoStartedAt = performance.now() - demoPausedElapsed;
+    demoLastTimeUpdateAt = -Infinity;
+    setupDemoRuler();
+  }
   updateHighlight();
+  if (timelineWasPlaying) playTimeline();
 });
 function formatInputDate(date) {
   const year = date.getFullYear();
@@ -1645,7 +2210,7 @@ if (validDateParameter(requestedDateFrom)
 prefectureFilterReset.addEventListener('click', () => {
   selectedPrefecture = '';
   updatePrefectureMiniMapSelection();
-  closeMobilePrefectureFilter();
+  closePrefectureFilter();
   resetSharedTimelineTime();
   load();
 });
@@ -1705,6 +2270,21 @@ async function copyCurrentViewUrl() {
 downloadButton.addEventListener('click', downloadCurrentData);
 downloadCsvButton.addEventListener('click', downloadCurrentCsv);
 shareButton?.addEventListener('click', copyCurrentViewUrl);
+demoModeButton.addEventListener('click', () => {
+  if (demoCanvas) stopDemoMode();
+  else startDemoMode();
+});
+demoExitButton.addEventListener('click', () => stopDemoMode());
+demoDetailsButton.addEventListener('click', () => {
+  const expanded = demoDetailsButton.getAttribute('aria-expanded') !== 'true';
+  demoDetailsButton.setAttribute('aria-expanded', String(expanded));
+  demoDetailsButton.textContent = expanded ? '閉じる' : '詳細';
+  document.body.classList.toggle('is-demo-details-open', expanded);
+  timelineDetails.hidden = !expanded;
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && demoCanvas) stopDemoMode();
+});
 guideDialog?.addEventListener('osm-guide-before-open', handleGuideBeforeOpen);
 guideDialog?.addEventListener('osm-guide-closed', handleGuideClosed);
 

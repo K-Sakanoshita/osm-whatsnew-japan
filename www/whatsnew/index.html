@@ -25,7 +25,7 @@
   <meta name="twitter:description" content="OpenStreetMapで日本国内に追加・編集された地物を、地図とタイムスケールで検索し、更新状況を集計できます。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260731-9">
+  <link rel="stylesheet" href="style.css?v=20260802-24">
 </head>
 
 <body class="map-page">
@@ -48,6 +48,23 @@
   <main>
     <div class="map-shell">
       <div id="map"></div>
+      <section id="prefecture-filter" class="prefecture-filter" aria-label="都道府県で絞り込み" hidden>
+        <div id="prefecture-mini-map" aria-label="都道府県選択マップ"></div>
+        <button id="prefecture-filter-reset" type="button" hidden disabled aria-label="全国表示に戻す" title="全国表示に戻す"><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14"><path d="M9 7 4 12l5 5v-3h5.5a4.5 4.5 0 0 1 4.2 2.9A7 7 0 0 0 12 8H9V7Z" fill="currentColor"/></svg><span>全国へ戻す</span></button>
+      </section>
+      <button id="prefecture-filter-toggle" class="timeline-region-button map-region-button" type="button" aria-expanded="false" aria-controls="prefecture-filter">地域選択</button>
+      <section id="demo-timescale" class="demo-timescale" hidden aria-label="星空モードのタイムスケール">
+        <div class="demo-year-row">
+          <div id="demo-year" class="demo-year"></div>
+          <div id="demo-playback-controls" class="demo-playback-controls" aria-label="星空デモの再生操作"></div>
+        </div>
+        <div class="demo-ruler-viewport">
+          <div id="demo-ruler-track" class="demo-ruler-track"></div>
+        </div>
+      </section>
+      <div class="demo-nightscape-title" aria-hidden="true"><span>OpenStreetMap</span><strong>NIGHTSCAPE</strong></div>
+      <button id="demo-details" class="demo-details-button" type="button" hidden aria-expanded="false" aria-controls="timeline-details">詳細</button>
+      <button id="demo-exit" class="demo-exit-button" type="button" hidden>戻る</button>
       <div class="map-top-left-overlays">
       <p id="status" class="loading-status" role="status" aria-live="polite">準備中…</p>
       <section id="timeline" class="timeline" hidden aria-label="更新時刻を選択">
@@ -56,8 +73,8 @@
           <time id="timeline-summary-datetime">—</time>
           <div class="timeline-summary-actions">
             <span id="timeline-summary-count">更新0件（累積0件）</span>
-            <button id="summary-play-timeline" type="button">再生</button>
             <button id="timeline-toggle" type="button" aria-expanded="false" aria-controls="timeline-details">詳細</button>
+            <button id="demo-mode" class="timeline-demo-button" type="button" disabled aria-pressed="false" title="取得した地物を星空のように表示">デモ</button>
           </div>
         </div>
         <div id="timeline-details" class="timeline-details" hidden>
@@ -76,7 +93,11 @@
           <label><input id="date-from" type="date" required aria-label="開始日"></label>
           <label><span>〜</span><input id="date-to" type="date" required aria-label="終了日"></label>
         </div>
-        <input id="time-range" type="range" aria-label="更新時刻">
+        <div class="timeline-range-row">
+          <input id="time-range" type="range" aria-label="更新時刻">
+          <button id="timeline-reset" type="button" disabled aria-label="タイムスケールを先頭に戻す" title="先頭に戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 8.5A8 8 0 1 1 4 13.2M5.5 8.5V4m0 4.5H10"/></svg></button>
+          <button id="summary-play-timeline" type="button" aria-label="タイムラインを再生" title="再生"></button>
+        </div>
         <div class="timeline-ends"><span id="time-start"></span><span id="time-end"></span></div>
         <div class="timeline-controls">
 
@@ -92,7 +113,6 @@
               <option value="1209600000">2週間</option>
             </select>
           </label>
-          <button id="prefecture-filter-toggle" class="timeline-region-button" type="button" aria-expanded="false" aria-controls="prefecture-filter">地域選択</button>
           <button id="download-data" class="timeline-icon-button timeline-download-button" type="button" disabled aria-label="表示中のデータをGeoJSONでダウンロード" title="表示中のデータをGeoJSONでダウンロード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5h9l5 5v14H5zM14 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><text x="12" y="16.2" fill="currentColor" font-family="system-ui,sans-serif" font-size="7.2" font-weight="800" text-anchor="middle">GJ</text></svg></button>
           <button id="download-csv" class="timeline-icon-button timeline-download-button" type="button" disabled aria-label="表示中のデータをCSVでダウンロード" title="表示中のデータをCSVでダウンロード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5h9l5 5v14H5zM14 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><text x="12" y="16" fill="currentColor" font-family="system-ui,sans-serif" font-size="5.5" font-weight="800" text-anchor="middle">CSV</text></svg></button>
           <button id="share-view" class="timeline-share-button" type="button" aria-label="現在の表示URLをコピー" title="現在の表示URLをコピー">
@@ -109,11 +129,8 @@
       </div>
       </div>
     </div>
+    <div id="list-resize-handle" class="list-resize-handle" role="separator" aria-label="地図とリストの幅を変更" aria-orientation="vertical" tabindex="0"></div>
     <aside>
-      <section id="prefecture-filter" class="prefecture-filter" aria-label="都道府県で絞り込み" hidden>
-        <div id="prefecture-mini-map" aria-label="都道府県選択ミニマップ"></div>
-        <button id="prefecture-filter-reset" type="button" hidden disabled aria-label="全国表示に戻す" title="全国表示に戻す"><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14"><path d="M9 7 4 12l5 5v-3h5.5a4.5 4.5 0 0 1 4.2 2.9A7 7 0 0 0 12 8H9V7Z" fill="currentColor"/></svg><span>全国へ戻す</span></button>
-      </section>
       <div class="poi-type-filter">
         <label for="poi-type"><span>種別</span><select id="poi-type" disabled><option value="">すべての種別</option></select></label>
       </div>
@@ -123,7 +140,7 @@
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
   <script src="help.js?v=20260731-1"></script>
   <script src="map-view.js"></script>
-  <script src="app.js?v=20260731-5"></script>
+  <script src="app.js?v=20260802-21"></script>
 </body>
 
 </html>
