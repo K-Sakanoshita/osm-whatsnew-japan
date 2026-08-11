@@ -3,7 +3,7 @@ const daysElement = document.querySelector('#days');
 const fromElement = document.querySelector('#from');
 const toElement = document.querySelector('#to');
 const statusElement = document.querySelector('#status');
-const detailsSummaryPrefecture = document.querySelector('#details-summary-prefecture');
+const detailsMapTitle = document.querySelector('#details-map-title');
 let prefectureFeatures = [];
 let selectedPrefecture = '';
 let categoryRules = {};
@@ -20,6 +20,7 @@ const CREATE_COLOR = '#177866';
 const MODIFY_COLOR = '#c45f32';
 const prefectureCountsCache = new Map();
 const PREFECTURE_FILL_LAYER = 'prefecture-select-fill';
+const PREFECTURE_OUTLINE_LAYER = 'prefecture-select-outline';
 const PREFECTURE_SELECTED_LAYER = 'prefecture-selected-fill';
 const PREFECTURE_NAME_EXPRESSION = ['coalesce', ['get', 'name:ja'], ['get', 'name']];
 const prefectureName = feature => String(feature?.properties?.['name:ja'] || feature?.properties?.name || '');
@@ -35,7 +36,7 @@ function updateTotalSummary(total, creates, modifies) {
   const detail = document.createElement('span');
   detail.className = 'summary-total-detail';
   detail.textContent = `（新規${number(creates)}件/更新${number(modifies)}件）`;
-  element.replaceChildren(main, document.createTextNode(' '), detail);
+  element.replaceChildren(main, detail);
 }
 
 const formatJstDateTime = value => {
@@ -181,7 +182,7 @@ function selectedPrefectureName() {
 
 function updateMapSelection() {
   nationwideButton.disabled = !selectedPrefecture;
-  detailsSummaryPrefecture.textContent = selectedPrefecture || '全国';
+  detailsMapTitle.textContent = `地域集計(${selectedPrefecture || '全国'})`;
   if (!prefectureMap?.getLayer(PREFECTURE_SELECTED_LAYER)) return;
   prefectureMap.setFilter(PREFECTURE_SELECTED_LAYER, ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture]);
 }
@@ -201,8 +202,9 @@ function initializePrefectureMap(geojson) {
     maxBounds: [[118, 18], [158, 50]],
     fadeDuration: 0,
     style: './tiles/osmfj_nopoi.json',
+    locale: window.osmSharedMapControls.locale,
   });
-  prefectureMap.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+  window.osmSharedMapControls.add(prefectureMap);
   window.osmSharedMapView.bind(prefectureMap);
   prefectureMap.on('load', () => {
     prefectureMap.addSource('prefecture-boundaries', {type: 'geojson', data: geojson});
@@ -230,11 +232,24 @@ function initializePrefectureMap(geojson) {
       },
     }, firstSymbolLayer);
     prefectureMap.addLayer({
+      id: PREFECTURE_OUTLINE_LAYER,
+      type: 'line',
+      source: 'prefecture-boundaries',
+      paint: {
+        'line-color': '#285b47',
+        'line-width': 1,
+        'line-opacity': 0.9,
+      },
+    }, firstSymbolLayer);
+    prefectureMap.addLayer({
       id: PREFECTURE_SELECTED_LAYER,
       type: 'line',
       source: 'prefecture-boundaries',
       filter: ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefectureName()],
-      paint: {'line-color': '#7b2d00', 'line-width': 3},
+      paint: {
+        'line-color': '#f05a24',
+        'line-width': 2,
+      },
     });
     prefectureMap.on('click', PREFECTURE_FILL_LAYER, event => {
       const name = prefectureName(event.features?.[0]);
@@ -350,7 +365,7 @@ function initializeChartActionFilters() {
       heading.append(actions);
     }
     const select = document.createElement('select');
-    select.className = 'chart-action-filter';
+    select.className = 'chart-action-filter form-select form-select-compact';
     select.dataset.chartAction = id;
     select.setAttribute('aria-label', 'グラフの更新種別');
     select.innerHTML = '<option value="both">新規・更新</option><option value="create">新規のみ</option><option value="modify">更新のみ</option>';
@@ -433,10 +448,36 @@ function renderMapperChart(entries, id = 'mapper-chart') {
       animation: false,
       scales: {
         x: {stacked: action === 'both', beginAtZero: true, ticks: {precision: 0}},
-        y: {stacked: action === 'both'},
+        y: {
+          stacked: action === 'both',
+          ticks: {color: '#155e4a', font: {weight: '600'}},
+        },
       },
     },
   });
+  const canvas = charts[id].canvas;
+  if (canvas.mapperProfileClickHandler) canvas.removeEventListener('click', canvas.mapperProfileClickHandler);
+  if (canvas.mapperProfileMoveHandler) canvas.removeEventListener('mousemove', canvas.mapperProfileMoveHandler);
+  const mapperAtEvent = event => {
+    const chart = charts[id];
+    const yScale = chart?.scales?.y;
+    if (!yScale) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * chart.width / rect.width;
+    const y = (event.clientY - rect.top) * chart.height / rect.height;
+    if (x < yScale.left || x > yScale.right || y < yScale.top || y > yScale.bottom) return null;
+    const index = Math.round(yScale.getValueForPixel(y));
+    return top[index]?.row?.editorUid ? top[index] : null;
+  };
+  canvas.mapperProfileClickHandler = event => {
+    const mapper = mapperAtEvent(event);
+    if (mapper) window.location.href = `profile.html?uid=${encodeURIComponent(mapper.row.editorUid)}`;
+  };
+  canvas.mapperProfileMoveHandler = event => {
+    canvas.style.cursor = mapperAtEvent(event) ? 'pointer' : '';
+  };
+  canvas.addEventListener('click', canvas.mapperProfileClickHandler);
+  canvas.addEventListener('mousemove', canvas.mapperProfileMoveHandler);
 }
 
 function mapperEntries(rows) {
@@ -453,7 +494,9 @@ function mapperTableRows(entries, total) {
   return entries.map((entry, index) => {
     const name = entry.row.editorName || '不明';
     const label = entry.row.editorUid ? `${name} (${entry.row.editorUid})` : name;
-    const linked = name === '不明' ? escapeHtml(label) : `<a href="https://www.openstreetmap.org/user/${encodeURIComponent(name)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    const linked = entry.row.editorUid
+      ? `<a href="profile.html?uid=${encodeURIComponent(entry.row.editorUid)}">${escapeHtml(label)}</a>`
+      : escapeHtml(label);
     return `<tr><td>${index + 1}</td><td>${linked}</td><td>${number(entry.creates)}</td><td>${number(entry.modifies)}</td><td>${number(entry.count)}</td><td>${percent(entry.count, total)}</td></tr>`;
   }).join('');
 }
@@ -660,7 +703,6 @@ function render(rows) {
   const changesets = countBy(rows.filter(row => row.changeset), row => row.changeset);
   updateTotalSummary(total, creates, total - creates);
   document.querySelector('#mappers').textContent = `${number(mapperRows.length)}人`;
-  document.querySelector('#changesets').textContent = `${number(changesets.length)}件`;
 
   const categories = countBy(rows, row => `${row.type}=${row.value}`);
   currentCategoryEntries = categories.slice(0, 100);
@@ -747,7 +789,6 @@ function renderNationwide(data) {
   }));
   updateTotalSummary(total, creates, modifies);
   document.querySelector('#mappers').textContent = `${number(mapperCount)}人`;
-  document.querySelector('#changesets').textContent = `${number(Number(data.changesetCount) || 0)}件`;
 
   const prefectures = (data.prefectures || []).map(row => ({
     key: row.name,
@@ -846,10 +887,8 @@ async function loadReport() {
 
     if (name) {
       render(data.rows);
-      document.querySelector('#report-title').textContent = `${name}の更新地物レポート`;
     } else {
       renderNationwide(data);
-      document.querySelector('#report-title').textContent = '日本全国の更新地物集計';
     }
     statusElement.textContent = '';
     document.querySelector('#period').textContent = `集計期間：${formatJstDateTime(data.meta.periodStart)} ～ ${formatJstDateTime(data.meta.periodEnd)}`;
@@ -876,9 +915,12 @@ async function initialize() {
     fetchJson('data/prefectures.min.geojson'),
     fetchJsonc('data/category-ja.jsonc'),
   ]);
-  apiUrl = String(configuration.apiUrl || '').trim();
-  if (!/^https?:\/\//.test(apiUrl)) {
-    throw new Error('data/config.jsonc の apiUrl に絶対URLを指定してください。');
+  try {
+    const resolvedApiUrl = new URL(String(configuration.apiUrl || '').trim(), window.location.href);
+    if (!/^https?:$/.test(resolvedApiUrl.protocol)) throw new Error();
+    apiUrl = resolvedApiUrl.href;
+  } catch {
+    throw new Error('data/config.jsonc の apiUrl はHTTP(S)の相対URLまたは絶対URLを指定してください。');
   }
   prefectureFeatures = geojson.features.sort((a, b) => prefectureName(a).localeCompare(prefectureName(b), 'ja'));
   categoryRules = categories.category || {};

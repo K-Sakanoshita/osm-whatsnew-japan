@@ -53,11 +53,12 @@
         </button>
       </div>
       <div class="map-guide-body">
-        <p id="map-guide-intro" class="map-guide-intro">OpenStreetMapで日本国内に追加・編集された地物を、地図・分析・密度の3つの画面で確認できるWebアプリケーションです。</p>
+        <p id="map-guide-intro" class="map-guide-intro">OpenStreetMapで日本国内に追加・編集された地物を、地図・分析・密度の画面とマッパー別プロフィールで確認できるWebアプリケーションです。</p>
         <ul class="map-guide-list">
           <li><img class="map-guide-image" src="image/map.png" width="1254" height="1254" alt=""><span><strong>地図</strong>新規作成（緑）・更新（オレンジ）の地物を表示し、時刻に沿って再生</span></li>
           <li><img class="map-guide-image" src="image/report.png" width="1254" height="1254" alt=""><span><strong>分析</strong>都道府県、タグ、編集者、日付、変更セット別に集計</span></li>
           <li><span class="map-guide-symbol" aria-hidden="true">▦</span><span><strong>密度</strong>選択期間に更新された地物を約1kmメッシュ単位で表示</span></li>
+          <li><span class="map-guide-symbol" aria-hidden="true">♙</span><span><strong>個人</strong>直近1年間の活動、継続レベル、獲得バッジをマッパー別に表示</span></li>
         </ul>
         <p class="map-guide-scope">タグ付きノードに加え、対象タグを持つwayとmultipolygon relationを対象としています。</p>
         <p class="map-guide-note"><strong>時刻について</strong>OSMへの登録・更新時刻を示すもので、施設の開業日や現実世界での変更日を示すものではありません。</p>

@@ -25,7 +25,8 @@
   <meta name="twitter:description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260802-33">
+  <link rel="stylesheet" href="style.css?v=20260811-22">
+  <link rel="stylesheet" href="coverage.css?v=20260811-7">
 </head>
 
 <body class="coverage-page">
@@ -42,16 +43,16 @@
       <a class="header-view-tab" href="index.html">地図</a>
       <a class="header-view-tab" href="details.html">分析</a>
       <a class="header-view-tab" href="coverage.html" aria-current="page">密度</a>
+      <a class="header-view-tab" href="profile.html">個人</a>
     </nav>
   </header>
   <main>
-    <div id="map" aria-label="約1kmタイルごとの対象地物密度"></div>
-    <section class="panel" aria-labelledby="panel-title">
-      <h2 id="panel-title">更新密度（約1kmメッシュ）</h2>
-      <p class="description">選択期間に更新された対象を集計します。</p>
+    <div id="map" class="map-surface" aria-label="約1kmタイルごとの対象地物密度"></div>
+    <section class="panel map-overlay-panel" aria-labelledby="panel-title">
+      <h2 id="panel-title" class="region-summary-title">更新密度（約1kmメッシュ）</h2>
       <div class="controls">
         <label for="days">対象期間</label>
-        <select id="days">
+        <select id="days" class="form-select">
           <option value="7">直近1週間</option>
           <option value="14" selected>直近2週間</option>
           <option value="30">直近30日</option>
@@ -74,8 +75,8 @@
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
-  <script src="help.js?v=20260731-1"></script>
-  <script src="map-view.js"></script>
+  <script src="help.js?v=20260810-1"></script>
+  <script src="map-view.js?v=20260811-1"></script>
   <script>
     'use strict';
 
@@ -111,18 +112,9 @@
       maxZoom: 18,
       maxBounds: [[118, 18], [158, 60]],
       style: './tiles/osmfj_nopoi.json',
-      locale: {
-        'GeolocateControl.FindMyLocation': '現在地へ移動',
-        'GeolocateControl.LocationNotAvailable': '現在地を取得できません',
-      },
+      locale: window.osmSharedMapControls.locale,
     });
-    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
-    map.addControl(new maplibregl.GeolocateControl({
-      positionOptions: {enableHighAccuracy: true},
-      trackUserLocation: false,
-      showUserLocation: true,
-      fitBoundsOptions: {maxZoom: 15},
-    }), 'bottom-right');
+    window.osmSharedMapControls.add(map);
     window.osmSharedMapView.bind(map);
 
     function longitudeToTileX(longitude, zoom = TILE_ZOOM) {
@@ -283,9 +275,12 @@
       try {
         if (!apiUrl) {
           const configuration = await readJsonc('data/config.jsonc');
-          apiUrl = String(configuration.apiUrl || '').trim();
-          if (!/^https?:\/\//.test(apiUrl)) {
-            throw new Error('data/config.jsoncのapiUrlが不正です。');
+          try {
+            const resolvedApiUrl = new URL(String(configuration.apiUrl || '').trim(), window.location.href);
+            if (!/^https?:$/.test(resolvedApiUrl.protocol)) throw new Error();
+            apiUrl = resolvedApiUrl.href;
+          } catch {
+            throw new Error('data/config.jsoncのapiUrlはHTTP(S)の相対URLまたは絶対URLを指定してください。');
           }
         }
 

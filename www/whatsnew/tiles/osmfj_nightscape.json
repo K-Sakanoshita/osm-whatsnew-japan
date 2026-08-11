@@ -1,0 +1,69 @@
+{
+  "version": 8,
+  "name": "OpenStreetMap NIGHTSCAPE",
+  "metadata": {
+    "openmaptiles:version": "3.x"
+  },
+  "center": [135.0, 32.5],
+  "zoom": 3.8,
+  "bearing": 0,
+  "pitch": 0,
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "https://tile.openstreetmap.jp/data/planet.json",
+      "attribution": "<a href=\"https://www.openstreetmap.org/copyright\">&copy; OpenStreetMap contributors</a>"
+    }
+  },
+  "layers": [
+    {
+      "id": "nightscape-land",
+      "type": "background",
+      "paint": {
+        "background-color": "#182536"
+      }
+    },
+    {
+      "id": "nightscape-sea",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "filter": [
+        "match",
+        ["get", "class"],
+        ["ocean", "sea"],
+        true,
+        false
+      ],
+      "paint": {
+        "fill-color": "#07111f",
+        "fill-opacity": 1
+      }
+    },
+    {
+      "id": "nightscape-coastline",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "filter": [
+        "match",
+        ["get", "class"],
+        ["ocean", "sea"],
+        true,
+        false
+      ],
+      "paint": {
+        "line-color": "#526a80",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          2, 0.5,
+          8, 0.8,
+          14, 1.2
+        ],
+        "line-opacity": 0.72
+      }
+    }
+  ]
+}

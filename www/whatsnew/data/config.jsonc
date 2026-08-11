@@ -1,4 +1,4 @@
 {
-  // 更新データを取得するAPIの絶対URL
-  "apiUrl": "https://armd-01.sakura.ne.jp/whatsnew/api.php"
+  // 相対URLは現在表示している環境（本番／ローカル）のURLを基準に解決
+  "apiUrl": "./api.php"
 }
