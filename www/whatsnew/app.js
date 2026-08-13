@@ -1,8 +1,21 @@
 const mapPageUrl = new URL(window.location.href);
-const WIDE_MAP_BOUNDS = [[115, 4], [146, 46]];
-const MAP_MOVEMENT_BOUNDS = [[110, 2], [158, 60]];
-const WIDE_MAP_CENTER = [130.5, 25];
+const indexIntro = document.querySelector('.index-intro');
+const indexIntroClose = document.querySelector('#index-intro-close');
+const INDEX_INTRO_SESSION_KEY = 'osm-index-intro-closed';
+try {
+  if (sessionStorage.getItem(INDEX_INTRO_SESSION_KEY) === '1') indexIntro.hidden = true;
+} catch { /* Session storage is optional. */ }
+indexIntroClose?.addEventListener('click', () => {
+  indexIntro.hidden = true;
+  try { sessionStorage.setItem(INDEX_INTRO_SESSION_KEY, '1'); } catch { /* Session storage is optional. */ }
+  window.setTimeout(() => map.resize(), 0);
+});
+const WIDE_MAP_BOUNDS = [[115, 4], [155, 46]];
+const MAP_MOVEMENT_BOUNDS = [[110, 2], [170, 60]];
+const WIDE_MAP_CENTER = [135, 32.5];
 const WIDE_MAP_ZOOM = 3.15;
+const NORMAL_MAP_STYLE = './tiles/osmfj_nopoi.json';
+const NIGHTSCAPE_MAP_STYLE = './tiles/osmfj_nightscape.json';
 const initialMapView = window.osmSharedMapView.read({
   fallbackCenter: WIDE_MAP_CENTER,
   fallbackZoom: WIDE_MAP_ZOOM,
@@ -34,6 +47,7 @@ const requestedStepValue = STEP_PARAMETER_TO_VALUE[mapPageUrl.searchParams.get('
 const rawPrefectureCode = (mapPageUrl.searchParams.get('pref') || '').toUpperCase();
 const requestedPrefectureCode = /^JP-\d{2}$/.test(rawPrefectureCode) ? rawPrefectureCode : '';
 const requestedTimeValue = Date.parse(mapPageUrl.searchParams.get('time') || '');
+const requestedAutomaticPlayback = mapPageUrl.searchParams.get('play') === '1';
 let pendingSharedTime = Number.isFinite(requestedTimeValue) ? requestedTimeValue : null;
 if (mapPageUrl.search) {
   const cleanUrl = new URL(mapPageUrl);
@@ -50,15 +64,16 @@ const map = new maplibregl.Map({
   pitchWithRotate: true,
   touchPitch: true,
   fadeDuration: 0,
-  style: './tiles/osmfj_nopoi.json',
+  style: NORMAL_MAP_STYLE,
+  locale: window.osmSharedMapControls.locale,
 });
-map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), 'bottom-right');
+window.osmSharedMapControls.add(map);
 window.osmSharedMapView.bind(map);
 
 
 const status = document.querySelector('#status');
-const mapPageMain = document.querySelector('.map-page main');
-const listPanel = document.querySelector('.map-page aside');
+const mapPageMain = document.querySelector('.index-page main');
+const listPanel = document.querySelector('.index-page aside');
 const listResizeHandle = document.querySelector('#list-resize-handle');
 const list = document.querySelector('#list');
 const listScroller = list;
@@ -67,17 +82,19 @@ const timeline = document.querySelector('#timeline');
 const range = document.querySelector('#time-range');
 const timelineRangeRow = document.querySelector('.timeline-range-row');
 const timelineResetButton = document.querySelector('#timeline-reset');
-const timelineSummaryPrefecture = document.querySelector('#timeline-summary-prefecture');
+const timelineMapTitle = document.querySelector('#timeline-map-title');
 const timelineSummaryDatetime = document.querySelector('#timeline-summary-datetime');
 const timelineSummaryCount = document.querySelector('#timeline-summary-count');
 const timelineDetails = document.querySelector('#timeline-details');
 const timelineToggle = document.querySelector('#timeline-toggle');
 const summaryPlayButton = document.querySelector('#summary-play-timeline');
+const timelinePlayButtons = document.querySelectorAll('.timeline-play-button');
 const timeStart = document.querySelector('#time-start');
 const timeEnd = document.querySelector('#time-end');
 const prefectureFilter = document.querySelector('#prefecture-filter');
 const prefectureFilterToggle = document.querySelector('#prefecture-filter-toggle');
 const timelineStep = document.querySelector('#timeline-step');
+const poiActionFilterSelect = document.querySelector('#poi-action-filter');
 const days = document.querySelector('#days');
 if ([...days.options].some(option => option.value === requestedDaysValue)) days.value = requestedDaysValue;
 const dateFrom = document.querySelector('#date-from');
@@ -100,9 +117,11 @@ const guideDialog = guide?.dialog;
 
 function updateSummaryPlayButton(playing, demo = false) {
   const action = playing ? '停止' : '再生';
-  summaryPlayButton.classList.toggle('is-playing', playing);
-  summaryPlayButton.setAttribute('aria-label', `${demo ? '星空デモ' : 'タイムライン'}を${action}`);
-  summaryPlayButton.title = action;
+  timelinePlayButtons.forEach((button) => {
+    button.classList.toggle('is-playing', playing);
+    button.setAttribute('aria-label', `${demo ? '星空デモ' : 'タイムライン'}を${action}`);
+    button.title = action;
+  });
 }
 
 const shareStatus = document.querySelector('#share-status');
@@ -284,13 +303,15 @@ let listScrollAnimationFrame = null;
 let dateReloadTimer = null;
 let allPoiItems = [];
 let selectedPoiType = '';
+let selectedPoiAction = 'both';
 let prefectureFeatures = [];
-let prefectureMiniMap = null;
 let selectedPrefecture = '';
 let renderVersion = 0;
 let mainMapReady = false;
 let prefectureStateReady = false;
 let initialLoadStarted = false;
+let fallbackMapIconPromise = null;
+const sourceMapIconPromises = new Map();
 let shareFeedbackTimer = null;
 let resumePlaybackAfterGuide = false;
 let automaticPlaybackPending = false;
@@ -301,6 +322,7 @@ let demoCanvas = null;
 let demoContext = null;
 let demoView = null;
 let demoStartedAt = 0;
+
 let demoPaused = false;
 let demoPausedElapsed = 0;
 let demoLastPaintAt = 0;
@@ -309,14 +331,15 @@ let demoRulerStart = 0;
 let demoRulerStep = 0;
 let demoRulerDrag = null;
 let demoTimelineDetailsWasExpanded = false;
-let demoLayerVisibilities = new Map();
 let demoSampleSource = null;
 let demoSampleSourceLength = 0;
 let demoSampleLimit = 0;
 let demoSampledFeatures = [];
+let mapStyleTransitioning = false;
 const DEMO_MOBILE_MAX_STARS = 2000;
-const DEMO_DESKTOP_MAX_STARS = 4000;
-const DEMO_STAR_CLUSTER_SIZE = 8;
+const DEMO_DESKTOP_MAX_STARS = 8000;
+const DEMO_MOBILE_CLUSTER_SIZE = 6;
+const DEMO_DESKTOP_CLUSTER_SIZE = 4;
 const DEMO_FRAME_INTERVAL = 1000 / 30;
 const DEMO_STEP_DURATION = 250;
 const DEMO_MIN_REVEAL_DURATION = 3000;
@@ -347,6 +370,26 @@ const demoTimeFormatter = new Intl.DateTimeFormat('ja-JP', {
   minute: '2-digit',
   hour12: false,
 });
+
+function setMapStyle(styleUrl) {
+  return new Promise((resolve, reject) => {
+    const started = performance.now();
+    const expectedName = styleUrl === NIGHTSCAPE_MAP_STYLE
+      ? 'OpenStreetMap NIGHTSCAPE'
+      : 'OpenStreetMap(with out poi)';
+    const check = () => {
+      if (map.getStyle()?.name === expectedName && map.isStyleLoaded()) {
+        resolve();
+      } else if (performance.now() - started >= 15000) {
+        reject(new Error('地図スタイルの切り替えがタイムアウトしました。'));
+      } else {
+        setTimeout(check, 50);
+      }
+    };
+    map.setStyle(styleUrl);
+    setTimeout(check, 0);
+  });
+}
 
 function demoRevealDuration() {
   const span = Number(range.max) - Number(range.min);
@@ -533,14 +576,15 @@ function paintDemoStars(now) {
   const cycleProgress = Math.min(1, cycleElapsed / revealDuration);
   const currentTime = minimum + (maximum - minimum) * cycleProgress;
   const visibleCount = demoVisibleFeatureCount(features, currentTime);
+  const clusterSize = window.innerWidth <= 700 ? DEMO_MOBILE_CLUSTER_SIZE : DEMO_DESKTOP_CLUSTER_SIZE;
   updateDemoTime(currentTime, now);
   const clusters = new Map();
   for (let index = 0; index < visibleCount; index++) {
     const feature = features[index];
     const point = map.project(feature.geometry.coordinates);
     if (point.x < -12 || point.y < -12 || point.x > width + 12 || point.y > height + 12) continue;
-    const cellX = Math.round(point.x / DEMO_STAR_CLUSTER_SIZE);
-    const cellY = Math.round(point.y / DEMO_STAR_CLUSTER_SIZE);
+    const cellX = Math.round(point.x / clusterSize);
+    const cellY = Math.round(point.y / clusterSize);
     const key = `${cellX}:${cellY}`;
     const action = feature.properties.action === 'create' ? 'create' : 'modify';
     const cluster = clusters.get(key);
@@ -564,43 +608,34 @@ function paintDemoStars(now) {
     const seed = cluster.seed;
     const wave = (Math.sin(elapsed * (1.4 + seed * 2.2) + seed * Math.PI * 2) + 1) / 2;
     const flare = Math.pow(wave, 6);
-    const countBoost = Math.min(2.2, Math.log2(cluster.count + 1) * 0.45);
+    const countStrength = Math.log2(cluster.count + 1);
+    const countBoost = Math.min(3.5, countStrength * 0.65);
     const radius = 1 + wave * 1.4 + countBoost;
     const color = cluster.create >= cluster.modify ? '137,255,217' : '255,190,126';
     if (flare > 0.12) {
       demoContext.beginPath();
       demoContext.arc(cluster.x, cluster.y, radius + flare * (4 + countBoost), 0, Math.PI * 2);
-      demoContext.fillStyle = `rgba(${color},${Math.min(0.28, flare * (0.18 + countBoost * 0.025))})`;
+      demoContext.fillStyle = `rgba(${color},${Math.min(0.4, flare * (0.2 + countStrength * 0.035))})`;
       demoContext.fill();
     }
     demoContext.beginPath();
     demoContext.arc(cluster.x, cluster.y, radius, 0, Math.PI * 2);
-    demoContext.fillStyle = `rgba(${color},${0.35 + wave * 0.65})`;
+    demoContext.fillStyle = `rgba(${color},${Math.min(1, 0.4 + wave * 0.5 + countStrength * 0.025)})`;
     demoContext.fill();
   }
 }
 
-function setDemoLayerVisibility(hidden) {
-  DEMO_HIDDEN_LAYERS.forEach(layerId => {
-    if (!map.getLayer(layerId)) return;
-    if (hidden) {
-      demoLayerVisibilities.set(layerId, map.getLayoutProperty(layerId, 'visibility') || 'visible');
-      map.setLayoutProperty(layerId, 'visibility', 'none');
-    } else {
-      map.setLayoutProperty(layerId, 'visibility', demoLayerVisibilities.get(layerId) || 'visible');
-    }
-  });
-  if (!hidden) demoLayerVisibilities.clear();
-}
-
-function stopDemoMode({restoreView = true} = {}) {
-  if (!demoCanvas) return;
+async function stopDemoMode({restoreView = true} = {}) {
+  if (!demoCanvas || mapStyleTransitioning) return;
+  mapStyleTransitioning = true;
+  demoModeButton.disabled = true;
+  demoExitButton.disabled = true;
+  demoDetailsButton.disabled = true;
   cancelAnimationFrame(demoAnimationFrame);
   demoAnimationFrame = null;
   demoCanvas.remove();
   demoCanvas = null;
   demoContext = null;
-  setDemoLayerVisibility(false);
   document.body.classList.remove('is-demo-mode');
   document.body.classList.remove('is-demo-details-open');
   demoModeButton.setAttribute('aria-pressed', 'false');
@@ -611,7 +646,7 @@ function stopDemoMode({restoreView = true} = {}) {
   demoDetailsButton.setAttribute('aria-expanded', 'false');
   demoDetailsButton.textContent = '詳細';
   timelineToggle.setAttribute('aria-expanded', String(demoTimelineDetailsWasExpanded));
-  timelineToggle.textContent = demoTimelineDetailsWasExpanded ? '閉じる' : '詳細';
+  timelineToggle.textContent = demoTimelineDetailsWasExpanded ? '閉じる' : '操作';
   timelineDetails.hidden = !demoTimelineDetailsWasExpanded;
   demoTimescale.hidden = true;
   demoYear.textContent = '';
@@ -622,24 +657,59 @@ function stopDemoMode({restoreView = true} = {}) {
   demoRulerDrag = null;
   demoRulerViewport.classList.remove('is-dragging');
   timelineRangeRow.append(timelineResetButton, summaryPlayButton);
-  map.resize();
-  if (restoreView && demoView) map.easeTo({...demoView, duration: 700});
-  demoView = null;
+  try {
+    await setMapStyle(NORMAL_MAP_STYLE);
+    await prepareFallbackMapIcons(markerEntries);
+    ensurePoiLayers();
+    map.getSource(POI_SOURCE)?.setData({type: 'FeatureCollection', features: poiFeatures});
+    updateClusterData(upperBound(Number(range.value)), true);
+    ensureMainPrefectureLayers();
+    updatePrefectureSelection();
+    map.once('idle', () => {
+      ensureMainPrefectureLayers();
+      updatePrefectureSelection();
+    });
+    void hydrateMapIcons(markerEntries, renderVersion).catch(error => console.error('地図アイコンを復元できませんでした:', error));
+    map.resize();
+    if (restoreView && demoView) map.easeTo({...demoView, duration: 700});
+  } catch (error) {
+    status.hidden = false;
+    status.textContent = `通常地図へ戻せませんでした: ${error.message}`;
+    console.error(error);
+  } finally {
+    demoView = null;
+    mapStyleTransitioning = false;
+    demoModeButton.disabled = !poiFeatures.length;
+    demoExitButton.disabled = false;
+    demoDetailsButton.disabled = false;
+  }
 }
 
-function startDemoMode() {
-  if (!poiFeatures.length || demoCanvas) return;
+async function startDemoMode() {
+  if (!poiFeatures.length || demoCanvas || mapStyleTransitioning) return;
+  mapStyleTransitioning = true;
+  demoModeButton.disabled = true;
   automaticPlaybackPending = false;
   pauseTimeline();
   osmPopup.remove();
   demoView = {center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch()};
   demoTimelineDetailsWasExpanded = timelineToggle.getAttribute('aria-expanded') === 'true';
+  try {
+    await setMapStyle(NIGHTSCAPE_MAP_STYLE);
+  } catch (error) {
+    demoView = null;
+    mapStyleTransitioning = false;
+    demoModeButton.disabled = false;
+    status.hidden = false;
+    status.textContent = `NIGHTSCAPEを開始できませんでした: ${error.message}`;
+    console.error(error);
+    return;
+  }
   demoCanvas = document.createElement('canvas');
   demoCanvas.className = 'demo-stars-canvas';
   demoCanvas.setAttribute('aria-hidden', 'true');
   map.getContainer().append(demoCanvas);
   demoContext = demoCanvas.getContext('2d');
-  setDemoLayerVisibility(true);
   document.body.classList.add('is-demo-mode');
   demoModeButton.setAttribute('aria-pressed', 'true');
   demoModeButton.textContent = 'デモ終了';
@@ -656,22 +726,30 @@ function startDemoMode() {
   demoLastPaintAt = 0;
   demoLastTimeUpdateAt = -Infinity;
   const mapContainer = map.getContainer();
-  map.fitBounds(WIDE_MAP_BOUNDS, {
+  const demoCamera = map.cameraForBounds(WIDE_MAP_BOUNDS, {
     padding: 36,
-    offset: [-mapContainer.clientWidth * 0.12, mapContainer.clientHeight * 0.12],
+    offset: [0, mapContainer.clientHeight * 0.12],
+  });
+  map.easeTo({
+    ...demoCamera,
+    center: [demoCamera.center.lng + (window.innerWidth <= 700 ? 2 : -0.8), demoCamera.center.lat],
+    zoom: 3.8,
     pitch: 0,
     bearing: 0,
     duration: 900,
   });
+  mapStyleTransitioning = false;
+  demoModeButton.disabled = false;
   demoAnimationFrame = requestAnimationFrame(paintDemoStars);
 }
 
 function setPrefectureFilterExpanded(expanded) {
+  if (expanded) pauseTimeline();
   prefectureFilterToggle.setAttribute('aria-expanded', String(expanded));
-  prefectureFilterToggle.textContent = expanded ? '地図に戻る' : '地域選択';
+  prefectureFilterToggle.textContent = expanded ? '全国へ' : '地域選択';
   prefectureFilter.hidden = !expanded;
   document.body.classList.toggle('is-prefecture-selecting', expanded);
-  if (expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
+  setPrefectureSelectionMode(expanded);
 }
 
 function closePrefectureFilter() {
@@ -679,14 +757,13 @@ function closePrefectureFilter() {
 }
 
 mobilePrefectureFilterMedia.addEventListener('change', () => {
-  const expanded = prefectureFilterToggle.getAttribute('aria-expanded') === 'true';
-  if (expanded) requestAnimationFrame(() => prefectureMiniMap?.resize());
+  if (prefectureFilterToggle.getAttribute('aria-expanded') === 'true') map.resize();
 });
 
-const PREFECTURE_MINI_SOURCE = 'mini-prefectures';
-const PREFECTURE_MINI_FILL_LAYER = 'mini-prefectures-fill';
-const PREFECTURE_MINI_SELECTED_LAYER = 'mini-prefectures-selected';
 const PREFECTURE_MAIN_SOURCE = 'selected-prefecture-boundary';
+const PREFECTURE_SELECT_FILL_LAYER = 'prefectures-select-fill';
+const PREFECTURE_SELECT_SELECTED_LAYER = 'prefectures-select-selected';
+const PREFECTURE_SELECT_OUTLINE_LAYER = 'prefectures-select-outline';
 const PREFECTURE_MAIN_CASING_LAYER = 'selected-prefecture-boundary-casing';
 const PREFECTURE_MAIN_LINE_LAYER = 'selected-prefecture-boundary-line';
 const PREFECTURE_NAME_EXPRESSION = ['coalesce', ['get', 'name:ja'], ['get', 'name']];
@@ -694,13 +771,13 @@ const prefectureName = feature => String(feature?.properties?.['name:ja'] || fea
 const prefectureCode = feature => String(feature?.properties?.['ISO3166-2'] || '').toUpperCase();
 
 function updateTimelineSummary() {
-  timelineSummaryPrefecture.textContent = selectedPrefecture || '全国';
+  timelineMapTitle.textContent = `新着情報(${selectedPrefecture || '全国'})`;
   if (!markerEntries.length) {
     timelineSummaryDatetime.textContent = '—';
     timelineSummaryDatetime.removeAttribute('datetime');
     timelineSummaryDatetime.removeAttribute('title');
   }
-  timelineSummaryCount.textContent = '更新0件（累積0件）';
+  timelineSummaryCount.textContent = '0件（累積0件）';
 }
 
 const parseUtcDate = value => {
@@ -916,6 +993,8 @@ function buildCurrentViewUrl({includeTime = false} = {}) {
   if (stepParameter) url.searchParams.set('step', stepParameter);
   else url.searchParams.delete('step');
 
+  url.searchParams.set('play', '1');
+
   if (!includeTime) {
     url.searchParams.delete('time');
   } else if (pendingSharedTime !== null) {
@@ -933,12 +1012,48 @@ function resetSharedTimelineTime() {
 }
 
 function ensureMainPrefectureLayers() {
-  if (!prefectureFeatures.length || !map.isStyleLoaded()) return;
+  if (demoCanvas || !prefectureFeatures.length || !map.isStyleLoaded()) return;
   const data = {type: 'FeatureCollection', features: prefectureFeatures};
   if (!map.getSource(PREFECTURE_MAIN_SOURCE)) {
     map.addSource(PREFECTURE_MAIN_SOURCE, {type: 'geojson', data});
   }
   const beforeLayer = map.getLayer(POI_HIGHLIGHT_LAYER) ? POI_HIGHLIGHT_LAYER : undefined;
+  if (!map.getLayer(PREFECTURE_SELECT_FILL_LAYER)) {
+    map.addLayer({
+      id: PREFECTURE_SELECT_FILL_LAYER,
+      type: 'fill',
+      source: PREFECTURE_MAIN_SOURCE,
+      layout: {visibility: 'none'},
+      paint: {
+        'fill-color': '#8bc99a',
+        'fill-opacity': 0.28,
+        'fill-outline-color': '#285b47',
+      },
+    }, beforeLayer);
+  }
+  if (!map.getLayer(PREFECTURE_SELECT_SELECTED_LAYER)) {
+    map.addLayer({
+      id: PREFECTURE_SELECT_SELECTED_LAYER,
+      type: 'fill',
+      source: PREFECTURE_MAIN_SOURCE,
+      filter: ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture],
+      layout: {visibility: 'none'},
+      paint: {
+        'fill-color': '#f08024',
+        'fill-opacity': 0.72,
+        'fill-outline-color': '#7b2d00',
+      },
+    }, beforeLayer);
+  }
+  if (!map.getLayer(PREFECTURE_SELECT_OUTLINE_LAYER)) {
+    map.addLayer({
+      id: PREFECTURE_SELECT_OUTLINE_LAYER,
+      type: 'line',
+      source: PREFECTURE_MAIN_SOURCE,
+      layout: {visibility: 'none'},
+      paint: {'line-color': '#285b47', 'line-width': 1, 'line-opacity': 0.9},
+    }, beforeLayer);
+  }
   if (!map.getLayer(PREFECTURE_MAIN_CASING_LAYER)) {
     map.addLayer({
       id: PREFECTURE_MAIN_CASING_LAYER,
@@ -965,16 +1080,28 @@ function ensureMainPrefectureLayers() {
       },
     }, beforeLayer);
   }
+  setPrefectureSelectionMode(prefectureFilterToggle.getAttribute('aria-expanded') === 'true');
 }
 
-function updatePrefectureMiniMapSelection() {
+function setPrefectureSelectionMode(enabled) {
+  [PREFECTURE_SELECT_FILL_LAYER, PREFECTURE_SELECT_SELECTED_LAYER, PREFECTURE_SELECT_OUTLINE_LAYER].forEach(layer => {
+    if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', enabled ? 'visible' : 'none');
+  });
+  DEMO_HIDDEN_LAYERS.forEach(layer => {
+    if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', enabled || demoCanvas ? 'none' : 'visible');
+  });
+  if (!enabled) map.getCanvas().style.cursor = '';
+}
+
+function updatePrefectureSelection() {
   prefectureFilterReset.disabled = !selectedPrefecture;
   prefectureFilterReset.hidden = !selectedPrefecture;
+  prefectureFilterToggle.hidden = Boolean(selectedPrefecture);
   updateTimelineSummary();
-  if (prefectureMiniMap?.getLayer(PREFECTURE_MINI_SELECTED_LAYER)) {
-    prefectureMiniMap.setFilter(PREFECTURE_MINI_SELECTED_LAYER, ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture]);
-  }
   ensureMainPrefectureLayers();
+  if (map.getLayer(PREFECTURE_SELECT_SELECTED_LAYER)) {
+    map.setFilter(PREFECTURE_SELECT_SELECTED_LAYER, ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture]);
+  }
   [PREFECTURE_MAIN_CASING_LAYER, PREFECTURE_MAIN_LINE_LAYER].forEach(layer => {
     if (map.getLayer(layer)) map.setFilter(layer, ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture]);
   });
@@ -1077,24 +1204,27 @@ function updatePoiTypeOptions(items) {
 
 async function applyPrefectureFilter(fitMap = false) {
   const feature = selectedPrefectureFeature();
-  updatePrefectureMiniMapSelection();
+  updatePrefectureSelection();
   if (fitMap && feature) {
     const box = prefectureBounds(feature);
     map.fitBounds([[box[0], box[1]], [box[2], box[3]]], {padding: 42, duration: 350, maxZoom: 9});
   }
   const areaItems = filterPoiItems(feature);
-  updatePoiTypeOptions(areaItems);
-  const filteredItems = selectedPoiType
-    ? areaItems.filter(item => poiTypeOptionKey(item) === selectedPoiType)
-    : areaItems;
-  await show(filteredItems);
-  if (!filteredItems.length) {
+  const actionFilteredItems = selectedPoiAction === 'both'
+    ? areaItems
+    : areaItems.filter(item => item.action === selectedPoiAction);
+  updatePoiTypeOptions(actionFilteredItems);
+  const typeFilteredItems = selectedPoiType
+    ? actionFilteredItems.filter(item => poiTypeOptionKey(item) === selectedPoiType)
+    : actionFilteredItems;
+  await show(typeFilteredItems);
+  if (!typeFilteredItems.length) {
     const area = selectedPrefecture || '全国';
     status.textContent = `${area}：選択期間のPOIは0件です。`;
   }
 }
 
-async function initializePrefectureMiniMap() {
+async function initializePrefectureLayers() {
   const response = await fetch('data/prefectures.min.geojson');
   if (!response.ok) throw new Error(`都道府県地図: ${response.status}`);
   const geojson = await response.json();
@@ -1103,79 +1233,36 @@ async function initializePrefectureMiniMap() {
     const requestedFeature = prefectureFeatures.find(feature => prefectureCode(feature) === requestedPrefectureCode);
     if (requestedFeature) selectedPrefecture = prefectureName(requestedFeature);
   }
+  if (!map.isStyleLoaded()) await new Promise(resolve => map.once('load', resolve));
   ensureMainPrefectureLayers();
-  prefectureMiniMap = new maplibregl.Map({
-    container: 'prefecture-mini-map',
-    center: [136.3, 35.5],
-    zoom: 3.15,
-    maxZoom: 7,
-    maxBounds: [[118, 18], [158, 50]],
-    pitch: 0,
-    bearing: 0,
-    antialias: true,
-    fadeDuration: 0,
-    attributionControl: false,
-    dragPan: true,
-    scrollZoom: true,
-    boxZoom: true,
-    dragRotate: false,
-    keyboard: true,
-    doubleClickZoom: true,
-    touchZoomRotate: true,
-    style: './tiles/osmfj_nopoi.json',
-  });
-  prefectureMiniMap.touchZoomRotate.disableRotation();
-  prefectureMiniMap.addControl(new maplibregl.NavigationControl({showCompass: false}), 'top-right');
-  prefectureMiniMap.on('load', () => {
-    prefectureMiniMap.setPitch(0);
-    prefectureMiniMap.setBearing(0);
-    prefectureMiniMap.addSource(PREFECTURE_MINI_SOURCE, {type: 'geojson', data: geojson});
-    prefectureMiniMap.addLayer({
-      id: PREFECTURE_MINI_FILL_LAYER,
-      type: 'fill',
-      source: PREFECTURE_MINI_SOURCE,
-      paint: {
-        'fill-color': '#8bc99a',
-        'fill-opacity': 0.28,
-        'fill-outline-color': '#285b47',
-      },
-    });
-    prefectureMiniMap.addLayer({
-      id: PREFECTURE_MINI_SELECTED_LAYER,
-      type: 'fill',
-      source: PREFECTURE_MINI_SOURCE,
-      filter: ['==', PREFECTURE_NAME_EXPRESSION, selectedPrefecture],
-      paint: {
-        'fill-color': '#f08024',
-        'fill-opacity': 0.72,
-        'fill-outline-color': '#7b2d00',
-      },
-    });
-    prefectureMiniMap.addLayer({
-      id: 'mini-prefectures-outline',
-      type: 'line',
-      source: PREFECTURE_MINI_SOURCE,
-      paint: {'line-color': '#285b47', 'line-width': 1.2, 'line-opacity': 0.9},
-    });
-    prefectureMiniMap.on('click', PREFECTURE_MINI_FILL_LAYER, event => {
-      const name = prefectureName(event.features?.[0]);
-      if (!name) return;
+  let selectionPending = false;
+  map.on('click', event => {
+    if (selectionPending || prefectureFilterToggle.getAttribute('aria-expanded') !== 'true') return;
+    const feature = map.queryRenderedFeatures(event.point, {
+      layers: [PREFECTURE_SELECT_SELECTED_LAYER, PREFECTURE_SELECT_FILL_LAYER],
+    })[0];
+    const name = prefectureName(feature);
+    if (!name) return;
+    selectionPending = true;
+    // Keep the POI layers hidden until every listener for this click has run.
+    setTimeout(() => {
       selectedPrefecture = name;
-      updatePrefectureMiniMapSelection();
+      updatePrefectureSelection();
       closePrefectureFilter();
       const box = prefectureBounds(selectedPrefectureFeature());
       map.fitBounds([[box[0], box[1]], [box[2], box[3]]], {padding: 42, duration: 350, maxZoom: 9});
       resetSharedTimelineTime();
       load();
-    });
-    prefectureMiniMap.on('mouseenter', PREFECTURE_MINI_FILL_LAYER, () => {
-      prefectureMiniMap.getCanvas().style.cursor = 'pointer';
-    });
-    prefectureMiniMap.on('mouseleave', PREFECTURE_MINI_FILL_LAYER, () => {
-      prefectureMiniMap.getCanvas().style.cursor = '';
-    });
-    updatePrefectureMiniMapSelection();
+      selectionPending = false;
+    }, 0);
   });
+  map.on('mouseenter', PREFECTURE_SELECT_FILL_LAYER, () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', PREFECTURE_SELECT_FILL_LAYER, () => {
+    map.getCanvas().style.cursor = '';
+  });
+  updatePrefectureSelection();
 }
 
 async function loadAllPois(daysValue, fromValue, toValue, prefectureValue = '', signal) {
@@ -1218,10 +1305,16 @@ function loadConfiguration() {
   if (!configurationPromise) {
     configurationPromise = jsonc('data/config.jsonc').then(configuration => {
       const configuredApiUrl = String(configuration.apiUrl || '').trim();
-      if (!/^https?:\/\//.test(configuredApiUrl)) {
-        throw new Error('data/config.jsonc の apiUrl に絶対URLを指定してください。');
+      let resolvedApiUrl;
+      try {
+        resolvedApiUrl = new URL(configuredApiUrl, window.location.href);
+      } catch {
+        throw new Error('data/config.jsonc の apiUrl が不正です。');
       }
-      apiUrl = configuredApiUrl;
+      if (!/^https?:$/.test(resolvedApiUrl.protocol)) {
+        throw new Error('data/config.jsonc の apiUrl はHTTP(S) URLを指定してください。');
+      }
+      apiUrl = resolvedApiUrl.href;
     });
   }
   return configurationPromise;
@@ -1487,8 +1580,8 @@ function createListItem(entry, index) {
   const editorLabel = item.editorName
     ? `${item.editorName}${item.editorUid ? ` (${item.editorUid})` : ''}`
     : '編集者不明';
-  const editor = item.editorName
-    ? `<a class="editor-link" href="https://www.openstreetmap.org/user/${encodeURIComponent(item.editorName)}" target="_blank" rel="noopener noreferrer">${escapeHtml(editorLabel)}</a>`
+  const editor = item.editorUid
+    ? `<a class="editor-link" href="profile.html?uid=${encodeURIComponent(item.editorUid)}">${escapeHtml(editorLabel)}</a>`
     : editorLabel;
   li.innerHTML = `<div class="list-title"><img class="list-icon" src="icon/${encodeURIComponent(item.icon)}" alt=""><strong>${escapeHtml(item.name)}</strong></div><span>${escapeHtml(item.categoryName)} · ${fmt(item.date)} · ${editor}</span>`;
   li.classList.toggle('is-highlighted', index >= highlightedListStart && index < highlightedListEnd);
@@ -1674,7 +1767,7 @@ function updateHighlight() {
   timelineSummaryDatetime.textContent = fmtTimelineSummary(selected);
   timelineSummaryDatetime.dateTime = new Date(selected).toISOString();
   timelineSummaryDatetime.title = fmt(selected);
-  timelineSummaryCount.textContent = `更新${highlighted.toLocaleString('ja-JP')}件（累積${visible.toLocaleString('ja-JP')}件）`;
+  timelineSummaryCount.textContent = `${highlighted.toLocaleString('ja-JP')}件（累積${visible.toLocaleString('ja-JP')}件）`;
   status.textContent = `${selectedPrefecture ? `${selectedPrefecture}：` : ''}${markerEntries.length}件中 ${visible}件を表示`;
 }
 function showOsmMenu(entry, syncList = true) {
@@ -1707,10 +1800,14 @@ function showOsmMenu(entry, syncList = true) {
 
   if (entry.item.editorName) {
     const editorLink = document.createElement('a');
-    editorLink.href = `https://www.openstreetmap.org/user/${encodeURIComponent(entry.item.editorName)}`;
-    editorLink.target = '_blank';
-    editorLink.rel = 'noopener noreferrer';
-    editorLink.textContent = `${entry.item.editorName}${entry.item.editorUid ? ` (${entry.item.editorUid})` : ''}`;
+    editorLink.href = entry.item.editorUid
+      ? `profile.html?uid=${encodeURIComponent(entry.item.editorUid)}`
+      : `https://www.openstreetmap.org/user/${encodeURIComponent(entry.item.editorName)}`;
+    if (!entry.item.editorUid) {
+      editorLink.target = '_blank';
+      editorLink.rel = 'noopener noreferrer';
+    }
+    editorLink.textContent = entry.item.editorName;
     addDetail('更新者', editorLink);
   } else {
     addDetail('更新者', '編集者不明');
@@ -1829,27 +1926,54 @@ function createPinImage(source, color) {
   return context.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-async function loadMapIcons(entries) {
-  const fallback = await map.loadImage('icon/marker-stroked.png');
-  const sourceImages = new Map();
-  const iconNames = new Set(entries.map(entry => entry.item.icon));
-  await Promise.all([...iconNames].map(async name => {
-    try {
-      const image = await map.loadImage(`icon/${encodeURIComponent(name)}`);
-      sourceImages.set(name, image.data);
-    } catch {
-      sourceImages.set(name, fallback.data);
-    }
-  }));
-  entries.forEach(entry => {
-    const action = entry.item.action === 'create' ? 'create' : 'modify';
-    const imageId = `poi-${action}-${entry.item.icon}`;
-    entry.item.mapIcon = imageId;
+function loadFallbackMapIcon() {
+  if (!fallbackMapIconPromise) {
+    fallbackMapIconPromise = map.loadImage('icon/marker-stroked.png').catch(error => {
+      fallbackMapIconPromise = null;
+      throw error;
+    });
+  }
+  return fallbackMapIconPromise;
+}
+
+async function prepareFallbackMapIcons(entries) {
+  const fallback = await loadFallbackMapIcon();
+  ['create', 'modify'].forEach(action => {
+    const imageId = `poi-${action}-fallback`;
     if (!map.hasImage(imageId)) {
       const color = action === 'create' ? CREATE_COLOR : MODIFY_COLOR;
-      map.addImage(imageId, createPinImage(sourceImages.get(entry.item.icon), color), {pixelRatio: 2});
+      map.addImage(imageId, createPinImage(fallback.data, color), {pixelRatio: 2});
     }
   });
+  entries.forEach(entry => {
+    const action = entry.item.action === 'create' ? 'create' : 'modify';
+    entry.item.mapIcon = `poi-${action}-fallback`;
+  });
+}
+
+async function hydrateMapIcons(entries, currentRender) {
+  const fallback = await loadFallbackMapIcon();
+  const iconNames = new Set(entries.map(entry => entry.item.icon));
+  await Promise.all([...iconNames].map(async name => {
+    if (!sourceMapIconPromises.has(name)) {
+      sourceMapIconPromises.set(name, map.loadImage(`icon/${encodeURIComponent(name)}`).catch(() => fallback));
+    }
+    const image = await sourceMapIconPromises.get(name);
+    ['create', 'modify'].forEach(action => {
+      const imageId = `poi-${action}-${name}`;
+      if (!map.hasImage(imageId)) {
+        const color = action === 'create' ? CREATE_COLOR : MODIFY_COLOR;
+        map.addImage(imageId, createPinImage(image.data, color), {pixelRatio: 2});
+      }
+    });
+  }));
+  if (currentRender !== renderVersion) return;
+  entries.forEach((entry, entryIndex) => {
+    const action = entry.item.action === 'create' ? 'create' : 'modify';
+    entry.item.mapIcon = `poi-${action}-${entry.item.icon}`;
+    if (poiFeatures[entryIndex]) poiFeatures[entryIndex].properties.icon = entry.item.mapIcon;
+  });
+  map.getSource(POI_SOURCE)?.setData({type: 'FeatureCollection', features: poiFeatures});
 }
 
 function ensurePoiLayers() {
@@ -1934,6 +2058,7 @@ function ensurePoiLayers() {
     });
     mapLayerEventsReady = true;
   }
+  setPrefectureSelectionMode(prefectureFilterToggle.getAttribute('aria-expanded') === 'true');
 }
 
 function waitForPoiSourceReady() {
@@ -1959,7 +2084,12 @@ async function show(items) {
   clearMarkers({preserveDemo: Boolean(demoCanvas)});
   status.hidden = false;
 
-  const ordered = [...items].sort((a, b) => parseUtcDate(a.date) - parseUtcDate(b.date));
+  // Keep the map source and the virtualized list on the same action filter,
+  // even when show() is reached through another redraw path.
+  const actionFilteredItems = selectedPoiAction === 'both'
+    ? items
+    : items.filter(item => item.action === selectedPoiAction);
+  const ordered = [...actionFilteredItems].sort((a, b) => parseUtcDate(a.date) - parseUtcDate(b.date));
   automaticPlaybackPending = false;
   if (!ordered.length) {
     setupTimeline([]);
@@ -1988,16 +2118,16 @@ async function show(items) {
   updateTimelineSummary();
   renderVirtualList(true);
 
-  status.textContent = `${markerEntries.length.toLocaleString('ja-JP')}件のアイコンを準備中…`;
+  status.textContent = '地図アイコンを準備中…';
   await waitForNextPaint();
-  await loadMapIcons(markerEntries);
+  await prepareFallbackMapIcons(markerEntries);
   if (currentRender !== renderVersion) return;
   ensurePoiLayers();
 
-  poiFeatures = new Array(markerEntries.length);
+  const nextPoiFeatures = new Array(markerEntries.length);
   for (let entryIndex = 0; entryIndex < markerEntries.length; entryIndex++) {
     const entry = markerEntries[entryIndex];
-    poiFeatures[entryIndex] = {
+    nextPoiFeatures[entryIndex] = {
       type: 'Feature',
       geometry: {type: 'Point', coordinates: [Number(entry.item.lon), Number(entry.item.lat)]},
       properties: {entryIndex, timestamp: entry.time, icon: entry.item.mapIcon, action: entry.item.action},
@@ -2008,6 +2138,9 @@ async function show(items) {
       if (currentRender !== renderVersion) return;
     }
   }
+  // Publish the array atomically so the demo sampler never caches a partially
+  // populated feature set while a large period is still being prepared.
+  poiFeatures = nextPoiFeatures;
 
   // Set the initial time filters before filling the source so an unfiltered
   // frame containing every POI can never be painted.
@@ -2023,15 +2156,14 @@ async function show(items) {
   await sourceReady;
   if (currentRender !== renderVersion) return;
 
-  await new Promise(resolve => waitForMapIdle(resolve));
-  if (currentRender !== renderVersion) return;
   status.hidden = true;
   downloadButton.disabled = false;
   downloadCsvButton.disabled = false;
   demoModeButton.disabled = false;
   timelineResetButton.disabled = false;
   timeline.hidden = false;
-  if (!demoCanvas) requestAutomaticPlayback();
+  void hydrateMapIcons(markerEntries, currentRender).catch(error => console.error('地図アイコンを読み込めませんでした:', error));
+  if (!demoCanvas && (!selectedPrefecture || requestedAutomaticPlayback)) requestAutomaticPlayback();
 }
 async function load() {
   const currentLoad = ++loadVersion;
@@ -2113,12 +2245,14 @@ timelineResetButton.addEventListener('click', () => {
   range.value = range.min;
   updateHighlight();
 });
-summaryPlayButton.addEventListener('click', () => {
-  if (demoCanvas) {
-    if (demoPaused) playDemoPlayback();
-    else pauseDemoPlayback();
-  } else if (isPlaying) pauseTimeline();
-  else playTimeline();
+timelinePlayButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    if (demoCanvas) {
+      if (demoPaused) playDemoPlayback();
+      else pauseDemoPlayback();
+    } else if (isPlaying) pauseTimeline();
+    else playTimeline();
+  });
 });
 prefectureFilterToggle.addEventListener('click', () => {
   const expanded = prefectureFilterToggle.getAttribute('aria-expanded') === 'true';
@@ -2127,7 +2261,7 @@ prefectureFilterToggle.addEventListener('click', () => {
 timelineToggle.addEventListener('click', () => {
   const expanded = timelineToggle.getAttribute('aria-expanded') !== 'true';
   timelineToggle.setAttribute('aria-expanded', String(expanded));
-  timelineToggle.textContent = expanded ? '閉じる' : '詳細';
+  timelineToggle.textContent = expanded ? '閉じる' : '操作';
   timelineDetails.hidden = !expanded;
 });
 timelineStep.addEventListener('change', () => {
@@ -2209,7 +2343,7 @@ if (validDateParameter(requestedDateFrom)
 
 prefectureFilterReset.addEventListener('click', () => {
   selectedPrefecture = '';
-  updatePrefectureMiniMapSelection();
+  updatePrefectureSelection();
   closePrefectureFilter();
   resetSharedTimelineTime();
   load();
@@ -2225,6 +2359,35 @@ poiTypeSelect.addEventListener('change', async () => {
   } catch (error) {
     status.hidden = false;
     status.textContent = `種別を変更できませんでした: ${error.message}`;
+  }
+});
+
+poiActionFilterSelect.addEventListener('change', async () => {
+  const demoWasPlaying = Boolean(demoCanvas && !demoPaused);
+  selectedPoiAction = poiActionFilterSelect.value;
+  resetSharedTimelineTime();
+  if (demoCanvas) {
+    demoPausedElapsed = 0;
+    demoStartedAt = performance.now();
+    demoLastPaintAt = 0;
+    seekDemoRuler(Number(range.min), true);
+  }
+  try {
+    await applyPrefectureFilter(false);
+    if (demoCanvas && markerEntries.length) {
+      seekDemoRuler(Number(range.min), true);
+      if (demoWasPlaying) {
+        demoPaused = false;
+        demoPausedElapsed = 0;
+        demoStartedAt = performance.now();
+        updateSummaryPlayButton(true, true);
+      }
+    } else if (!demoCanvas) {
+      pauseTimeline();
+    }
+  } catch (error) {
+    status.hidden = false;
+    status.textContent = `地物フィルターを変更できませんでした: ${error.message}`;
   }
 });
 
@@ -2289,16 +2452,16 @@ guideDialog?.addEventListener('osm-guide-before-open', handleGuideBeforeOpen);
 guideDialog?.addEventListener('osm-guide-closed', handleGuideClosed);
 
 function startInitialLoadWhenReady() {
-  if (initialLoadStarted || !mainMapReady || !prefectureStateReady) return;
+  if (initialLoadStarted || !mainMapReady || (requestedPrefectureCode && !prefectureStateReady)) return;
   initialLoadStarted = true;
-  updatePrefectureMiniMapSelection();
+  updatePrefectureSelection();
   load();
 }
 
 if (guide && !guide.hasSeen()) guide.open({mode: 'automatic', focusTarget: map.getCanvas()});
 
-initializePrefectureMiniMap().catch(error => {
-  status.textContent = `都道府県地図を読み込めませんでした: ${error.message}`;
+initializePrefectureLayers().catch(error => {
+  if (!initialLoadStarted) status.textContent = `都道府県地図を読み込めませんでした: ${error.message}`;
   console.error(error);
 }).finally(() => {
   prefectureStateReady = true;
@@ -2308,7 +2471,7 @@ function handleMainMapReady() {
   if (mainMapReady) return;
   mainMapReady = true;
   ensureMainPrefectureLayers();
-  updatePrefectureMiniMapSelection();
+  updatePrefectureSelection();
   startInitialLoadWhenReady();
 }
 

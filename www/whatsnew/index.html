@@ -25,15 +25,16 @@
   <meta name="twitter:description" content="OpenStreetMapで日本国内に追加・編集された地物を、地図とタイムスケールで検索し、更新状況を集計できます。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260802-24">
+  <link rel="stylesheet" href="style.css?v=20260812-2">
+  <link rel="stylesheet" href="index.css?v=20260812-4">
 </head>
 
-<body class="map-page">
+<body class="index-page">
   <header>
     <img class="site-logo" src="image/site.png" width="480" height="480" alt="">
     <div>
       <h1><button id="map-guide-open" class="site-info-trigger" type="button" aria-haspopup="dialog" aria-label="このサイトの見方を開く"><span>OSM What’s New Japan</span></button></h1>
-      <small>OpenStreetMapの新着/更新地物(POI)分析サイト</small>
+      <small>OpenStreetMap 新着・更新POIダッシュボード</small>
     </div>
     <button class="header-menu-toggle" type="button" aria-expanded="false" aria-controls="header-view-tabs" aria-label="画面メニューを開く">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -42,17 +43,24 @@
       <a class="header-view-tab" href="index.html" aria-current="page">地図</a>
       <a class="header-view-tab" href="details.html">分析</a>
       <a class="header-view-tab" href="coverage.html">密度</a>
+      <a class="header-view-tab" href="profile.html">マッパー</a>
     </nav>
 
   </header>
+  <section class="index-intro" aria-labelledby="index-intro-title">
+    <h2 id="index-intro-title">日本の地図は、どこが新しくなった？</h2>
+    <p><span>OpenStreetMapで最近追加・更新された場所を地図から確認できます。</span><span>地域ごとの傾向や、マッパーごとの活動も見られます。</span></p>
+    <button id="index-intro-close" type="button" aria-label="案内を閉じる" title="案内を閉じる">×</button>
+  </section>
   <main>
-    <div class="map-shell">
+    <div class="map-shell map-surface">
       <div id="map"></div>
-      <section id="prefecture-filter" class="prefecture-filter" aria-label="都道府県で絞り込み" hidden>
-        <div id="prefecture-mini-map" aria-label="都道府県選択マップ"></div>
-        <button id="prefecture-filter-reset" type="button" hidden disabled aria-label="全国表示に戻す" title="全国表示に戻す"><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14"><path d="M9 7 4 12l5 5v-3h5.5a4.5 4.5 0 0 1 4.2 2.9A7 7 0 0 0 12 8H9V7Z" fill="currentColor"/></svg><span>全国へ戻す</span></button>
-      </section>
-      <button id="prefecture-filter-toggle" class="timeline-region-button map-region-button" type="button" aria-expanded="false" aria-controls="prefecture-filter">地域選択</button>
+      <section id="prefecture-filter" class="prefecture-filter" aria-label="都道府県で絞り込み" hidden></section>
+      <div class="map-action-buttons">
+        <button id="prefecture-filter-reset" class="timeline-action-button timeline-region-button map-region-button" type="button" hidden disabled aria-label="全国へ" title="全国へ"><span>全国へ</span></button>
+        <button id="prefecture-filter-toggle" class="timeline-action-button timeline-region-button map-region-button" type="button" aria-expanded="false" aria-controls="prefecture-filter">地域選択</button>
+        <button id="demo-mode" class="timeline-action-button timeline-region-button map-region-button" type="button" disabled aria-pressed="false" title="取得した地物を星空のように表示">デモ</button>
+      </div>
       <section id="demo-timescale" class="demo-timescale" hidden aria-label="星空モードのタイムスケール">
         <div class="demo-year-row">
           <div id="demo-year" class="demo-year"></div>
@@ -63,24 +71,30 @@
         </div>
       </section>
       <div class="demo-nightscape-title" aria-hidden="true"><span>OpenStreetMap</span><strong>NIGHTSCAPE</strong></div>
-      <button id="demo-details" class="demo-details-button" type="button" hidden aria-expanded="false" aria-controls="timeline-details">詳細</button>
-      <button id="demo-exit" class="demo-exit-button" type="button" hidden>戻る</button>
+      <button id="demo-details" class="demo-mode-button demo-details-button" type="button" hidden aria-expanded="false" aria-controls="timeline-details">詳細</button>
+      <button id="demo-exit" class="demo-mode-button demo-exit-button" type="button" hidden>戻る</button>
+      <p id="status" class="loading-status map-overlay-panel" role="status" aria-live="polite">準備中…</p>
       <div class="map-top-left-overlays">
-      <p id="status" class="loading-status" role="status" aria-live="polite">準備中…</p>
-      <section id="timeline" class="timeline" hidden aria-label="更新時刻を選択">
+      <section id="timeline" class="timeline map-overlay-panel" hidden aria-label="更新時刻を選択">
         <div class="timeline-summary">
-          <strong id="timeline-summary-prefecture">全国</strong>
-          <time id="timeline-summary-datetime">—</time>
+          <h2 id="timeline-map-title" class="region-summary-title">新着情報(全国)</h2>
+          <div class="timeline-summary-time-row">
+            <time id="timeline-summary-datetime">—</time>
+            <span id="timeline-summary-count">0件（累積0件）</span>
+          </div>
           <div class="timeline-summary-actions">
-            <span id="timeline-summary-count">更新0件（累積0件）</span>
-            <button id="timeline-toggle" type="button" aria-expanded="false" aria-controls="timeline-details">詳細</button>
-            <button id="demo-mode" class="timeline-demo-button" type="button" disabled aria-pressed="false" title="取得した地物を星空のように表示">デモ</button>
+            <button id="timeline-summary-play" class="timeline-action-button timeline-play-button" type="button" aria-label="タイムラインを再生" title="再生"></button>
+            <button id="timeline-toggle" class="timeline-action-button" type="button" aria-expanded="false" aria-controls="timeline-details">操作</button>
+            <button id="share-view" class="timeline-action-button timeline-share-button" type="button" aria-label="現在の表示URLをコピー" title="現在の表示URLをコピー">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 16.1c-.8 0-1.5.3-2 .8L8.9 12.8c.1-.3.1-.5.1-.8s0-.5-.1-.8L16 7.1c.5.5 1.2.8 2 .8a3 3 0 1 0-3-3c0 .3 0 .5.1.8L8 9.8a3 3 0 1 0 0 4.4l7.1 4.1c-.1.2-.1.5-.1.7a3 3 0 1 0 3-2.9Z" fill="currentColor"/></svg>
+            </button>
+            <span id="share-status" class="visually-hidden" aria-live="polite"></span>
           </div>
         </div>
         <div id="timeline-details" class="timeline-details" hidden>
         <div class="timeline-dates">
           <label class="timeline-period-label"><span>期間</span>
-            <select id="days">
+            <select id="days" class="form-select form-select-compact">
               <option value="1">1日</option>
               <option value="2" selected>2日</option>
               <option value="7">1週間</option>
@@ -96,13 +110,20 @@
         <div class="timeline-range-row">
           <input id="time-range" type="range" aria-label="更新時刻">
           <button id="timeline-reset" type="button" disabled aria-label="タイムスケールを先頭に戻す" title="先頭に戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 8.5A8 8 0 1 1 4 13.2M5.5 8.5V4m0 4.5H10"/></svg></button>
-          <button id="summary-play-timeline" type="button" aria-label="タイムラインを再生" title="再生"></button>
+          <button id="summary-play-timeline" class="timeline-play-button" type="button" aria-label="タイムラインを再生" title="再生"></button>
         </div>
-        <div class="timeline-ends"><span id="time-start"></span><span id="time-end"></span></div>
+        <div class="timeline-ends mobile-hidden"><span id="time-start"></span><span id="time-end"></span></div>
         <div class="timeline-controls">
-
+          <div class="timeline-display-controls" role="group" aria-label="表示設定">
+          <label class="timeline-action-filter-label">対象
+            <select id="poi-action-filter" class="form-select form-select-compact" aria-label="表示する地物の更新種別">
+              <option value="both" selected>新規・更新</option>
+              <option value="create">新規のみ</option>
+              <option value="modify">更新のみ</option>
+            </select>
+          </label>
           <label class="timeline-step-label">間隔
-            <select id="timeline-step" aria-label="タイムスケールの間隔">
+            <select id="timeline-step" class="form-select form-select-compact" aria-label="タイムスケールの間隔">
               <option value="600000">10分</option>
               <option value="1800000">30分</option>
               <option value="3600000" selected>1時間</option>
@@ -113,12 +134,11 @@
               <option value="1209600000">2週間</option>
             </select>
           </label>
+          </div>
+          <div class="timeline-auxiliary-controls" role="group" aria-label="ダウンロード">
           <button id="download-data" class="timeline-icon-button timeline-download-button" type="button" disabled aria-label="表示中のデータをGeoJSONでダウンロード" title="表示中のデータをGeoJSONでダウンロード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5h9l5 5v14H5zM14 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><text x="12" y="16.2" fill="currentColor" font-family="system-ui,sans-serif" font-size="7.2" font-weight="800" text-anchor="middle">GJ</text></svg></button>
           <button id="download-csv" class="timeline-icon-button timeline-download-button" type="button" disabled aria-label="表示中のデータをCSVでダウンロード" title="表示中のデータをCSVでダウンロード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5h9l5 5v14H5zM14 2.5v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><text x="12" y="16" fill="currentColor" font-family="system-ui,sans-serif" font-size="5.5" font-weight="800" text-anchor="middle">CSV</text></svg></button>
-          <button id="share-view" class="timeline-share-button" type="button" aria-label="現在の表示URLをコピー" title="現在の表示URLをコピー">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 16.1c-.8 0-1.5.3-2 .8L8.9 12.8c.1-.3.1-.5.1-.8s0-.5-.1-.8L16 7.1c.5.5 1.2.8 2 .8a3 3 0 1 0-3-3c0 .3 0 .5.1.8L8 9.8a3 3 0 1 0 0 4.4l7.1 4.1c-.1.2-.1.5-.1.7a3 3 0 1 0 3-2.9Z" fill="currentColor"/></svg>
-          </button>
-          <span id="share-status" class="visually-hidden" aria-live="polite"></span>
+          </div>
         </div>
         </div>
       </section>
@@ -132,15 +152,15 @@
     <div id="list-resize-handle" class="list-resize-handle" role="separator" aria-label="地図とリストの幅を変更" aria-orientation="vertical" tabindex="0"></div>
     <aside>
       <div class="poi-type-filter">
-        <label for="poi-type"><span>種別</span><select id="poi-type" disabled><option value="">すべての種別</option></select></label>
+        <label for="poi-type"><span>種別</span><select id="poi-type" class="form-select form-select-fill" disabled><option value="">すべての種別</option></select></label>
       </div>
       <ol id="list"></ol>
     </aside>
   </main>
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
-  <script src="help.js?v=20260731-1"></script>
-  <script src="map-view.js"></script>
-  <script src="app.js?v=20260802-21"></script>
+  <script src="help.js?v=20260812-3"></script>
+  <script src="map-view.js?v=20260811-1"></script>
+  <script src="app.js?v=20260812-1"></script>
 </body>
 
 </html>

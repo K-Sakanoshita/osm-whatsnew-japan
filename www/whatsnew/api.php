@@ -20,9 +20,9 @@ try {
     );
 
     $mode = strtolower(trim((string) ($_GET['mode'] ?? 'pois')));
-    $allowedModes = ['pois', 'japan', 'prefectures', 'facets'];
+    $allowedModes = ['pois', 'japan', 'prefectures', 'facets', 'profile', 'mapper_search', 'profile_region_mappers'];
     if (!in_array($mode, $allowedModes, true)) {
-        throw new InvalidArgumentException('mode must be pois, japan, prefectures, or facets.');
+        throw new InvalidArgumentException('Unsupported mode.');
     }
 
     $validDate = static fn(string $value): bool =>
@@ -175,6 +175,280 @@ try {
         unset($row);
         return $rows;
     };
+
+    if ($mode === 'mapper_search') {
+        $stage = 'mapper search';
+        $query = $readTextFilter('q', 255);
+        if ($query === '') {
+            throw new InvalidArgumentException('mapper_search mode requires q.');
+        }
+        $escapedQuery = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
+        $mappers = $fetchAll(
+            $pdo,
+            'SELECT editor_uid AS uid, editor_name AS name,
+                    total_count AS total, last_activity_at AS lastActivityAt
+               FROM mapper_profile_stats
+              WHERE editor_name LIKE :name_prefix ESCAPE \'\\\\\'
+              ORDER BY (editor_name = :exact_name) DESC,
+                       last_activity_at DESC, total_count DESC, editor_name
+              LIMIT 10',
+            ['name_prefix' => $escapedQuery . '%', 'exact_name' => $query]
+        );
+        $mappers = $castCounts($mappers, ['total']);
+        echo json_encode(
+            ['meta' => ['mode' => 'mapper_search', 'query' => $query], 'mappers' => $mappers],
+            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+        );
+        exit;
+    }
+
+    if ($mode === 'profile_region_mappers') {
+        $stage = 'profile region mappers';
+        if ($prefecture === '') {
+            $mappers = $fetchAll(
+                $pdo,
+                'SELECT editor_uid AS uid, editor_name AS name,
+                        total_count AS total, create_count AS creates,
+                        modify_count AS `modifies`, last_activity_at AS lastActivityAt
+                  FROM mapper_profile_stats
+                  ORDER BY last_activity_at DESC, total_count DESC, editor_name, editor_uid
+                  LIMIT 100',
+                []
+            );
+        } else {
+            $mappers = $fetchAll(
+                $pdo,
+                'SELECT area.editor_uid AS uid, stats.editor_name AS name,
+                        area.total_count AS total, area.create_count AS creates,
+                        area.modify_count AS `modifies`, stats.last_activity_at AS lastActivityAt
+                   FROM mapper_profile_prefectures area
+                   JOIN mapper_profile_stats stats ON stats.editor_uid = area.editor_uid
+                  WHERE area.prefecture = :prefecture
+                  ORDER BY stats.last_activity_at DESC, area.total_count DESC,
+                           stats.editor_name, area.editor_uid
+                  LIMIT 100',
+                ['prefecture' => $prefecture]
+            );
+        }
+        echo json_encode(
+            [
+                'meta' => ['mode' => 'profile_region_mappers', 'prefecture' => $prefecture],
+                'mappers' => $castCounts($mappers, ['total', 'creates', 'modifies']),
+            ],
+            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+        );
+        exit;
+    }
+
+    if ($mode === 'profile') {
+        $stage = 'profile';
+        if ($editorUidText === '') {
+            throw new InvalidArgumentException('profile mode requires editor_uid.');
+        }
+        require_once __DIR__ . '/profile-lib.php';
+
+        $profileStatement = $pdo->prepare(
+            'SELECT stats.*, avatars.avatar_url
+               FROM mapper_profile_stats stats
+               LEFT JOIN mapper_profile_avatars avatars ON avatars.editor_uid = stats.editor_uid
+              WHERE stats.editor_uid = :editor_uid'
+        );
+        $profileStatement->execute(['editor_uid' => $editorUidText]);
+        $profile = $profileStatement->fetch();
+        if (!$profile) {
+            echo json_encode(
+                ['meta' => ['mode' => 'profile', 'editorUid' => $editorUidText], 'profile' => null],
+                JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+            exit;
+        }
+
+        $numericProfileFields = [
+            'total_count', 'create_count', 'modify_count', 'changeset_count',
+            'active_day_count', 'active_week_count', 'active_month_count',
+            'prefecture_count', 'category_count', 'current_week_streak',
+            'longest_week_streak', 'current_month_streak', 'longest_month_streak',
+        ];
+        foreach ($numericProfileFields as $field) $profile[$field] = (int) $profile[$field];
+        unset(
+            $profile['active_week_count'],
+            $profile['current_week_streak'],
+            $profile['longest_week_streak'],
+            $profile['active_month_count'],
+            $profile['current_month_streak'],
+            $profile['longest_month_streak']
+        );
+        $currentMonth = (new DateTimeImmutable('now', new DateTimeZone('Asia/Tokyo')))
+            ->modify('first day of this month')->format('Y-m-d');
+        $monthlyStatement = $pdo->prepare(
+            'SELECT total_count, create_count, modify_count, active_day_count
+               FROM mapper_activity_months
+              WHERE editor_uid = :editor_uid AND month_start = :month_start'
+        );
+        $monthlyStatement->execute(['editor_uid' => $editorUidText, 'month_start' => $currentMonth]);
+        $monthlySummary = $monthlyStatement->fetch() ?: [
+            'total_count' => 0,
+            'create_count' => 0,
+            'modify_count' => 0,
+            'active_day_count' => 0,
+        ];
+        foreach ($monthlySummary as $field => $value) $monthlySummary[$field] = (int) $value;
+        $monthlyTotal = $monthlySummary['total_count'];
+        $profile['monthlySummary'] = $monthlySummary;
+        $profile['monthlyLevel'] = profileMonthlyLevel($monthlyTotal);
+        $profile['cumulativeLevel'] = profileCumulativeLevel($profile['total_count']);
+
+        $categories = $fetchAll(
+            $pdo,
+            'SELECT category, category_value AS value, total_count AS total,
+                    create_count AS creates, modify_count AS `modifies`
+               FROM mapper_profile_categories WHERE editor_uid = :editor_uid
+              ORDER BY total_count DESC, category, category_value LIMIT 10',
+            ['editor_uid' => $editorUidText]
+        );
+        $categories = $castCounts($categories, ['total', 'creates', 'modifies']);
+
+        $prefectures = $fetchAll(
+            $pdo,
+            'SELECT prefecture, total_count AS total,
+                    create_count AS creates, modify_count AS `modifies`
+               FROM mapper_profile_prefectures WHERE editor_uid = :editor_uid
+              ORDER BY total_count DESC, prefecture LIMIT 10',
+            ['editor_uid' => $editorUidText]
+        );
+        $prefectures = $castCounts($prefectures, ['total', 'creates', 'modifies']);
+
+        $awards = $fetchAll(
+            $pdo,
+            'SELECT badge_key AS badgeKey, earned_at AS earnedAt,
+                    progress_updated_at AS progressUpdatedAt,
+                    progress_value AS progressValue,
+                    badge_version AS badgeVersion,
+                    acquisition_source AS acquisitionSource
+               FROM mapper_badges
+              WHERE editor_uid = :editor_uid AND revoked_at IS NULL
+              ORDER BY earned_at DESC, badge_key',
+            ['editor_uid' => $editorUidText]
+        );
+        $definitions = profileBadgeDefinitions();
+        $badgeDefinitions = [];
+        foreach ($definitions as $key => $definition) {
+            $badgeDefinitions[] = [
+                'badgeKey' => $key,
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'icon' => $definition['icon'],
+                'badgeGroup' => $definition['badge_group'] ?? null,
+                'badgeLevel' => $definition['badge_level'] ?? null,
+            ];
+        }
+        $badgePrefectureStatement = $pdo->prepare(
+            'SELECT prefecture, total_count, active_day_count
+               FROM mapper_profile_prefectures WHERE editor_uid = :editor_uid'
+        );
+        $badgePrefectureStatement->execute(['editor_uid' => $editorUidText]);
+        $badgeStats = $profile;
+        $badgeStats['prefectures'] = [];
+        $badgeStats['prefecture_values'] = [];
+        $badgeStats['prefecture_active_day_values'] = [];
+        foreach ($badgePrefectureStatement->fetchAll() as $row) {
+            $badgeStats['prefectures'][] = (string) $row['prefecture'];
+            $badgeStats['prefecture_values'][(string) $row['prefecture']] = (int) $row['total_count'];
+            $badgeStats['prefecture_active_day_values'][(string) $row['prefecture']] = (int) $row['active_day_count'];
+        }
+        $badgeCategoryStatement = $pdo->prepare(
+            'SELECT category, category_value, total_count
+               FROM mapper_profile_categories WHERE editor_uid = :editor_uid'
+        );
+        $badgeCategoryStatement->execute(['editor_uid' => $editorUidText]);
+        $badgeStats['category_values'] = [];
+        foreach ($badgeCategoryStatement->fetchAll() as $row) {
+            $badgeStats['category_values'][(string) $row['category'] . '=' . (string) $row['category_value']] = (int) $row['total_count'];
+        }
+        $earnedKeys = [];
+        foreach ($awards as &$award) {
+            $award['progressValue'] = (int) $award['progressValue'];
+            $award['badgeVersion'] = (int) $award['badgeVersion'];
+            $award += $definitions[$award['badgeKey']] ?? [
+                'name' => $award['badgeKey'], 'description' => '', 'icon' => '🏅',
+                'metric' => '', 'threshold' => 0,
+            ];
+            $award['badgeGroup'] = $award['badge_group'] ?? null;
+            $award['badgeLevel'] = $award['badge_level'] ?? null;
+            $earnedKeys[$award['badgeKey']] = true;
+        }
+        unset($award);
+
+        $nextBadges = [];
+        foreach ($definitions as $key => $definition) {
+            if (isset($earnedKeys[$key])) continue;
+            $progress = profileBadgeProgress($badgeStats, $definition);
+            $nextBadges[] = ['badgeKey' => $key, 'progressValue' => $progress] + $definition;
+        }
+        usort($nextBadges, static fn($a, $b) =>
+            (($b['progressValue'] / max(1, $b['threshold'])) <=> ($a['progressValue'] / max(1, $a['threshold'])))
+        );
+        $nextBadges = array_slice($nextBadges, 0, 3);
+
+        $recent = $fetchAll(
+            $pdo,
+            'SELECT osm_type AS type, osm_id AS id, name, category,
+                    category_value AS categoryValue, prefecture,
+                    osm_timestamp AS date, changeset_id AS changeset,
+                    change_action AS action, latitude AS lat, longitude AS lon
+               FROM osm_poi
+              WHERE editor_uid = :editor_uid
+              ORDER BY osm_timestamp DESC LIMIT 18',
+            ['editor_uid' => $editorUidText]
+        );
+
+        $related = $fetchAll(
+            $pdo,
+            'SELECT candidate.editor_uid AS uid, candidate.editor_name AS name,
+                    candidate_avatar.avatar_url AS avatarUrl,
+                    candidate.total_count AS total, candidate.create_count AS creates,
+                    candidate.modify_count AS `modifies`,
+                    SUM(LEAST(candidate_pref.total_count, own_pref.total_count)) AS sharedScore,
+                    candidate.last_activity_at AS lastActivityAt
+               FROM mapper_profile_prefectures own_pref
+               JOIN mapper_profile_prefectures candidate_pref
+                 ON candidate_pref.prefecture = own_pref.prefecture
+                AND candidate_pref.editor_uid <> own_pref.editor_uid
+               JOIN mapper_profile_stats candidate ON candidate.editor_uid = candidate_pref.editor_uid
+               LEFT JOIN mapper_profile_avatars candidate_avatar
+                 ON candidate_avatar.editor_uid = candidate.editor_uid
+              WHERE own_pref.editor_uid = :editor_uid
+              GROUP BY candidate.editor_uid, candidate.editor_name, candidate.total_count,
+                       candidate.create_count, candidate.modify_count, candidate.last_activity_at,
+                       candidate_avatar.avatar_url
+              ORDER BY sharedScore DESC,
+                       CRC32(CONCAT(candidate.editor_uid, CURDATE(), :editor_uid_sort))
+              LIMIT 9',
+            ['editor_uid' => $editorUidText, 'editor_uid_sort' => $editorUidText]
+        );
+        $related = $castCounts($related, ['total', 'creates', 'modifies', 'sharedScore']);
+
+        echo json_encode(
+            [
+                'meta' => [
+                    'mode' => 'profile',
+                    'editorUid' => $editorUidText,
+                    'scope' => 'OSM What’s New Japanの収集対象地物・直近1年間',
+                    'calculatedAt' => $profile['calculated_at'],
+                ],
+                'profile' => $profile,
+                'badges' => $awards,
+                'nextBadges' => $nextBadges,
+                'badgeDefinitions' => $badgeDefinitions,
+                'categories' => $categories,
+                'prefectures' => $prefectures,
+                'recent' => $recent,
+                'relatedMappers' => $related,
+            ],
+            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+        );
+        exit;
+    }
 
     if ($mode === 'pois') {
         $stage = 'pois';

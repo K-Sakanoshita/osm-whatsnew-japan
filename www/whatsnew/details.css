@@ -1,0 +1,437 @@
+/* 全国・都道府県別レポート */
+.details-page #status {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  bottom: 50px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(88, 111, 103, .35);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 2px 8px rgba(24, 54, 44, .16);
+  color: #174d3e;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none
+}
+
+
+.details-page #status:empty {
+  display: none
+}
+
+
+.details-page .prefecture-map-panel {
+  margin-bottom: 20px;
+  box-shadow: 0 4px 18px rgba(34, 76, 62, .08)
+}
+
+
+.details-page .map-guide-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px
+}
+
+
+.details-page #show-nationwide {
+  position: absolute;
+  z-index: 3;
+  bottom: 10px;
+  left: 10px;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid #b6c9c1;
+  border-radius: 6px;
+  background: #12634f;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer
+}
+
+
+.details-page #show-nationwide:hover:not(:disabled) {
+  background: #0d4e3e
+}
+
+
+.details-page #show-nationwide:disabled {
+  background: #e8eeeb;
+  color: #87958f;
+  cursor: default
+}
+
+
+.details-page .map-guide-dates {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 5px 0 0;
+  white-space: nowrap;
+  overflow-x: auto
+}
+
+
+.details-page .map-guide-dates label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #40564e;
+  font-size: 12px;
+  min-width: 0
+}
+
+
+.details-page .map-guide-dates label span {
+  display: inline-block;
+  flex: 0 0 auto;
+  margin: 0;
+  color: #40564e;
+  font-size: inherit;
+  white-space: nowrap;
+  word-break: keep-all
+}
+
+
+.details-page .map-guide-date-separator {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: #40564e;
+  font-size: 12px
+}
+
+
+.details-page .map-guide-dates input[type="date"] {
+  width: auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #b9c9c1;
+  border-radius: 5px;
+  background: #fff;
+  font: inherit
+}
+
+
+.details-page .summary-section {
+  margin-top: 18px
+}
+
+
+.details-page .summary-section #period {
+  grid-column: 1/-1;
+  margin: 0;
+  color: #607169;
+  font-size: 13px
+}
+
+
+.details-page .summary-card {
+  color: inherit;
+  text-decoration: none;
+  transition: transform .15s, border-color .15s, box-shadow .15s
+}
+
+
+.details-page .summary-card::after {
+  content: "→";
+  position: absolute;
+  top: 16px;
+  right: 17px;
+  color: #6e9487;
+  font-size: 20px
+}
+
+
+.details-page .summary-card small {
+  display: block;
+  margin-top: 6px;
+  color: #557269;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px
+}
+
+
+.details-page .summary-card:hover,
+.details-page .summary-card:focus-visible {
+  border-color: #7fa998;
+  box-shadow: 0 7px 18px rgba(24, 54, 44, .13);
+  transform: translateY(-2px);
+  outline: none
+}
+
+
+.details-page #mapper-ranking,
+.details-page #changeset-ranking {
+  scroll-margin-top: 12px
+}
+
+
+.details-page h3,
+#profile-directory-title {
+  margin: 0;
+  color: #173f34;
+  font-size: 18px;
+  letter-spacing: .01em
+}
+
+
+.details-page .ranking-heading,
+.details-page .category-mapper-actions {
+  align-items: center;
+  gap: 8px
+}
+
+
+.details-page .chart-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px
+}
+
+
+.details-page .chart-action-filter {
+  min-width: 104px
+}
+
+
+.details-page .ranking-heading .csv-icon-button,
+.details-page .category-mapper-actions .csv-icon-button {
+  width: 30px;
+  height: 30px
+}
+
+
+.details-page .ranking-heading .csv-icon-button svg,
+.details-page .category-mapper-actions .csv-icon-button svg {
+  width: 24px;
+  height: 24px
+}
+
+
+.details-page .hint {
+  margin: 4px 0 11px;
+  color: #6b7b74;
+  font-size: 12px
+}
+
+
+.details-page .chart-wrap {
+  position: relative;
+  height: 310px;
+  margin: 6px 0 14px;
+  padding: 8px 8px 2px;
+  border-radius: 9px;
+  background: #fbfdfc;
+  box-sizing: border-box
+}
+
+
+.details-page .chart-wrap-daily {
+  height: 310px
+}
+
+
+.details-page .ranking-details {
+  border-top: 1px solid #dce8e3
+}
+
+
+.details-page .ranking-filter {
+  width: 100%;
+  margin: 0 0 9px;
+  padding: 9px 11px;
+  border: 1px solid #b8cbc3;
+  border-radius: 7px;
+  background: #fbfdfc;
+  color: #243d35;
+  font: inherit;
+  box-sizing: border-box
+}
+
+
+.details-page .ranking-filter:focus {
+  border-color: #178467;
+  outline: 3px solid rgba(23, 132, 103, .16)
+}
+
+
+.details-page .category-mapper-button {
+  padding: 5px 8px;
+  border-color: #8daaa0;
+  background: #fff;
+  color: #155e4a;
+  font-size: 11px;
+  white-space: nowrap
+}
+
+
+.details-page .category-mapper-ranking {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid #cbdcd5
+}
+
+
+.details-page .category-mapper-ranking[hidden] {
+  display: none
+}
+
+
+.details-page .category-mapper-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px
+}
+
+
+.details-page .category-mapper-heading h4 {
+  margin: 0;
+  color: #173f34;
+  font-size: 16px
+}
+
+
+.details-page .category-mapper-heading p {
+  margin: 3px 0 0;
+  color: #6b7b74;
+  font-size: 11px
+}
+
+
+.details-page .category-mapper-heading button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-color: #8daaa0;
+  background: #fff;
+  color: #155e4a;
+  font-size: 11px
+}
+
+
+.details-page table {
+  width: 100%;
+  border-collapse: collapse
+}
+
+
+.details-page th,
+.details-page td {
+  padding: 8px 7px;
+  border-bottom: 1px solid #e6eeea;
+  text-align: left;
+  vertical-align: top
+}
+
+
+.details-page th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  color: #52675f;
+  font-size: 12px
+}
+
+
+.details-page th:nth-last-child(-n+2),
+.details-page td:nth-last-child(-n+2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums
+}
+
+
+.details-page a {
+  color: #155e4a
+}
+
+
+@media(max-width:1100px) {
+  .details-page .chart-wrap,
+  .details-page .chart-wrap-daily {
+    height: 340px
+  }
+
+}
+
+
+@media(max-width:900px) {
+
+  .details-page .summary-section strong {
+    font-size: 20px
+  }
+
+}
+
+
+@media(max-width:700px) {
+
+  .details-page .chart-wrap,
+  .details-page .chart-wrap-daily {
+    height: 300px
+  }
+
+
+  .details-page .ranking-heading {
+    align-items: flex-start;
+    flex-wrap: wrap
+  }
+
+
+  .details-page .chart-heading-actions {
+    margin-left: auto
+  }
+
+
+  .details-page .map-guide-dates {
+    gap: 7px;
+    margin: 3px 0 0
+  }
+
+
+  .details-page .map-guide-dates label {
+    flex: 1 1 0;
+    gap: 4px;
+    font-size: 10px
+  }
+
+
+  .details-page .map-guide-dates select {
+    padding: 4px;
+    font-size: 11px
+  }
+
+
+  .details-page .map-guide-dates input[type="date"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    padding: 4px 3px;
+    font-size: 11px
+  }
+
+}
+
+
+@media(max-width:700px) and (max-aspect-ratio:1/1) {
+
+  .details-page header form {
+    grid-column: 1/-1;
+    justify-content: flex-end;
+    gap: 5px;
+    font-size: 12px
+  }
+
+
+  .details-page header form select,
+  .details-page header form button {
+    padding: 7px 9px;
+    font-size: 12px
+  }
+
+}

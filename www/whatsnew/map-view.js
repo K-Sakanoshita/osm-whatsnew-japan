@@ -65,3 +65,22 @@
 
   window.osmSharedMapView = {read, save, bind};
 })();
+
+(() => {
+  const locale = Object.freeze({
+    'GeolocateControl.FindMyLocation': '現在地へ移動',
+    'GeolocateControl.LocationNotAvailable': '現在地を取得できません',
+  });
+
+  function add(map) {
+    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    map.addControl(new maplibregl.GeolocateControl({
+      positionOptions: {enableHighAccuracy: true},
+      trackUserLocation: false,
+      showUserLocation: true,
+      fitBoundsOptions: {maxZoom: 15},
+    }), 'bottom-right');
+  }
+
+  window.osmSharedMapControls = {add, locale};
+})();

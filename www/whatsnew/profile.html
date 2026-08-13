@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>マッパープロフィール｜OSM What’s New Japan</title>
+  <meta name="description" content="OSM What’s New Japanが確認した直近1年間の対象地物から、マッパーの活動、継続レベル、バッジを表示します。">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#12634f">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="canonical" href="https://armd-01.sakura.ne.jp/whatsnew/profile.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:site_name" content="OSM What’s New Japan">
+  <meta property="og:title" content="マッパープロフィール｜OSM What’s New Japan">
+  <meta property="og:description" content="直近1年間の対象地物から、マッパーの活動、継続レベル、バッジを表示します。">
+  <meta property="og:url" content="https://armd-01.sakura.ne.jp/whatsnew/profile.html">
+  <meta property="og:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="マッパープロフィール｜OSM What’s New Japan">
+  <meta name="twitter:description" content="直近1年間の対象地物から、マッパーの活動、継続レベル、バッジを表示します。">
+  <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css?v=20260812-2">
+  <link rel="stylesheet" href="profile.css?v=20260813-51">
+</head>
+<body class="profile-page">
+  <header>
+    <img class="site-logo" src="image/site.png" width="480" height="480" alt="">
+    <div><h1><button id="map-guide-open" class="site-info-trigger" type="button" aria-haspopup="dialog" aria-label="このサイトの見方を開く"><span>OSM What’s New Japan</span></button></h1><small>OpenStreetMap 新着・更新POIダッシュボード</small></div>
+    <button class="header-menu-toggle" type="button" aria-expanded="false" aria-controls="header-view-tabs" aria-label="画面メニューを開く">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav id="header-view-tabs" class="header-view-tabs" aria-label="画面切り替え">
+      <a class="header-view-tab" href="index.html">地図</a>
+      <a class="header-view-tab" href="details.html">分析</a>
+      <a class="header-view-tab" href="coverage.html">密度</a>
+      <a class="header-view-tab" href="profile.html" aria-current="page">マッパー</a>
+    </nav>
+  </header>
+
+  <main class="wide-page-main">
+    <p id="profile-status" class="profile-status" role="status" aria-live="polite">地図または分析画面のマッパー名からプロフィールを開いてください。</p>
+
+    <section id="profile-directory" class="profile-directory" hidden>
+      <div class="profile-directory-map-panel primary-map-panel map-surface">
+        <div id="profile-directory-map" class="primary-map-canvas" role="application" aria-label="都道府県を選択する地図"></div>
+        <section class="profile-directory-search map-overlay-panel map-overlay-panel-top-left" aria-labelledby="profile-mapper-search-title">
+          <h2 id="profile-mapper-search-title" class="region-summary-title">マッパーを探す</h2>
+          <form id="profile-mapper-search-form" role="search">
+            <label class="visually-hidden" for="profile-mapper-search-input">ユーザー名</label>
+            <input id="profile-mapper-search-input" name="q" type="search" maxlength="255" autocomplete="off" placeholder="ユーザー名の先頭を入力" required role="combobox" aria-autocomplete="list" aria-controls="profile-mapper-search-results" aria-expanded="false">
+            <button type="submit">検索</button>
+          </form>
+          <div id="profile-mapper-search-results" class="profile-mapper-search-results" role="listbox" aria-label="マッパー候補" aria-live="polite" hidden></div>
+        </section>
+      </div>
+      <section id="profile-directory-results" class="map-followup-content content-panel" aria-live="polite" hidden>
+        <div class="profile-section-heading section-heading"><div><h3 id="profile-directory-title"></h3></div><span id="profile-directory-count"></span></div>
+        <p id="profile-directory-status" class="profile-directory-result-status"></p>
+        <ol id="profile-directory-list" class="item-grid mapper-list"></ol>
+      </section>
+    </section>
+
+    <div id="profile-content" hidden>
+      <section class="profile-hero">
+        <div id="profile-avatar" class="profile-avatar" aria-hidden="true"></div>
+        <div class="profile-identity"><h2 id="profile-name"></h2><p id="profile-period"></p><div class="profile-links"><a id="osm-profile-link" target="_blank" rel="noopener noreferrer">OSMプロフィール ↗</a><button id="profile-replay-badges" type="button" hidden>もう一度見る</button></div></div>
+      </section>
+      <p class="profile-scope">このページはOSM What’s New Japanが現在確認できる収集対象地物を集計したもので、OSMでの全編集活動を表すものではありません。</p>
+
+      <section class="profile-activity-card content-panel">
+        <div class="profile-section-heading section-heading"><div class="profile-badge-heading-title"><h3>今月の活動状況</h3><button id="profile-level-guide-open" class="profile-badge-guide-open" type="button" aria-haspopup="dialog" aria-controls="profile-level-guide" aria-label="レベルアップ条件を表示" title="レベルアップ条件を表示">❓</button></div></div>
+        <div class="profile-activity-summaries">
+          <div id="profile-summary" class="summary-section summary-grid" aria-label="今月の活動まとめ"></div>
+          <div id="profile-streaks" class="summary-section summary-grid"></div>
+        </div>
+      </section>
+
+      <section class="content-panel"><div class="profile-section-heading section-heading"><div class="profile-badge-heading-title"><h3>獲得バッジ</h3><button id="profile-badge-guide-open" class="profile-badge-guide-open" type="button" aria-haspopup="dialog" aria-controls="profile-badge-guide" aria-label="バッジ条件を表示" title="バッジ条件を表示">❓</button></div><span id="profile-badge-count"></span></div><div id="profile-badges" class="profile-badges item-grid"></div><details id="profile-older-badges" class="profile-older-badges disclosure-panel" hidden></details><div id="profile-next-badges" class="profile-next-badges"></div></section>
+
+      <div class="profile-two-column content-grid">
+        <section class="content-panel"><div class="profile-section-heading section-heading"><h3>よく活動するカテゴリ</h3><span id="profile-category-count"></span></div><div id="profile-categories" class="profile-ranking-bars"></div></section>
+        <section class="content-panel"><div class="profile-section-heading section-heading"><h3>活動地域</h3><span id="profile-region-count"></span></div><div id="profile-activity-map" class="primary-map-canvas primary-map-panel map-surface" role="img" aria-label="活動地域を示す地図"></div></section>
+      </div>
+
+      <section class="content-panel"><div class="profile-section-heading section-heading"><div><h3>最近の活動</h3></div></div><div id="profile-recent" class="profile-recent-list"></div><details id="profile-recent-more" class="profile-recent-more disclosure-panel" hidden><summary></summary></details></section>
+      <section class="content-panel"><div class="profile-section-heading section-heading"><div><h3>同じ地域で活動するマッパー</h3></div></div><ol id="profile-related" class="item-grid mapper-list"></ol></section>
+    </div>
+  </main>
+  <dialog id="profile-level-guide" class="profile-badge-guide" aria-labelledby="profile-level-guide-title">
+    <div class="profile-badge-guide-heading"><div><h2 id="profile-level-guide-title">レベルアップ条件</h2><p>編集した対象地物の件数に応じてレベルが上がります。</p></div><button id="profile-level-guide-close" type="button" aria-label="閉じる">×</button></div>
+    <div class="profile-badge-guide-list profile-level-guide-list">
+      <section class="profile-level-guide-group"><h3>月間レベル</h3><p>今月の編集件数で判定します。</p><ol>
+        <li><b>Lv.1</b><span>1件</span><strong>これからマッパー</strong></li>
+        <li><b>Lv.2</b><span>10件</span><strong>それなりマッパー</strong></li>
+        <li><b>Lv.3</b><span>50件</span><strong>そこそこマッパー</strong></li>
+        <li><b>Lv.4</b><span>100件</span><strong>たくさんマッパー</strong></li>
+        <li><b>Lv.5</b><span>250件</span><strong>ものすごマッパー</strong></li>
+        <li><b>Lv.6</b><span>500件</span><strong>とんでもマッパー</strong></li>
+        <li><b>Lv.7</b><span>1,000件</span><strong>さいこうマッパー</strong></li>
+      </ol></section>
+      <section class="profile-level-guide-group"><h3>累積レベル</h3><p>集計期間内の編集件数で判定します。</p><ol>
+        <li><b>Lv.1</b><span>1件</span><strong>Registered Editor</strong></li>
+        <li><b>Lv.2</b><span>10件</span><strong>Novice Editor</strong></li>
+        <li><b>Lv.3</b><span>25件</span><strong>Apprentice Editor</strong></li>
+        <li><b>Lv.4</b><span>50件</span><strong>Journeyman Editor</strong></li>
+        <li><b>Lv.5</b><span>100件</span><strong>Yeoman Editor</strong></li>
+        <li><b>Lv.6</b><span>250件</span><strong>Experienced Editor</strong></li>
+        <li><b>Lv.7</b><span>500件</span><strong>Veteran Editor</strong></li>
+        <li><b>Lv.8</b><span>1,000件</span><strong>Veteran Editor II</strong></li>
+        <li><b>Lv.9</b><span>1,500件</span><strong>Veteran Editor III</strong></li>
+        <li><b>Lv.10</b><span>2,000件</span><strong>Veteran Editor IV</strong></li>
+        <li><b>Lv.11</b><span>3,000件</span><strong>Senior Editor</strong></li>
+        <li><b>Lv.12</b><span>4,000件</span><strong>Senior Editor II</strong></li>
+        <li><b>Lv.13</b><span>5,000件</span><strong>Senior Editor III</strong></li>
+        <li><b>Lv.14</b><span>7,500件</span><strong>Master Editor</strong></li>
+        <li><b>Lv.15</b><span>10,000件</span><strong>Master Editor II</strong></li>
+        <li><b>Lv.16</b><span>15,000件</span><strong>Master Editor III</strong></li>
+        <li><b>Lv.17</b><span>20,000件</span><strong>Master Editor IV</strong></li>
+        <li><b>Lv.18</b><span>30,000件</span><strong>Grandmaster Editor</strong></li>
+      </ol></section>
+    </div>
+  </dialog>
+  <dialog id="profile-badge-guide" class="profile-badge-guide" aria-labelledby="profile-badge-guide-title">
+    <div class="profile-badge-guide-heading"><div><h2 id="profile-badge-guide-title">バッジの獲得条件</h2><p>直近1年間の活動をもとに判定します。獲得済みのバッジはその後も保持されます。</p></div><button id="profile-badge-guide-close" type="button" aria-label="閉じる">×</button></div>
+    <div id="profile-badge-guide-list" class="profile-badge-guide-list"></div>
+  </dialog>
+  <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
+  <script src="help.js?v=20260812-3"></script>
+  <script src="map-view.js?v=20260811-1"></script>
+  <script src="profile.js?v=20260813-69"></script>
+</body>
+</html>

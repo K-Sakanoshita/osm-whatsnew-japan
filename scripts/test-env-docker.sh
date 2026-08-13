@@ -5,6 +5,9 @@ PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCUMENT_ROOT="${PROJECT_ROOT}/www/whatsnew"
 COMPOSE_FILE="${PROJECT_ROOT}/compose.test.yml"
 APP_CONFIG="${PROJECT_ROOT}/docker/test-host/private-osm-test-config.php"
+SCHEMA_FILE="${DOCUMENT_ROOT}/schema.sql"
+PROFILE_TEST_DATA_FILE="${PROJECT_ROOT}/docker/test-db/profile-test-data.sql"
+PROFILE_TEST_DATA_VERSION="8"
 
 WEB_HOST="${WEB_HOST:-0.0.0.0}"
 WEB_PORT="${WEB_PORT:-8000}"
@@ -36,6 +39,7 @@ require_environment() {
     require_command docker
     require_command php
     require_command curl
+    require_command start-stop-daemon
     docker compose version >/dev/null 2>&1 \
         || fail "Docker Composeプラグインがありません。"
     docker info >/dev/null 2>&1 \
@@ -68,6 +72,9 @@ validate_settings() {
         || fail "MariaDBとphpMyAdminに同じポートは指定できません。"
     [[ "${TEST_RUNTIME_DIR}" = /* ]] || fail "TEST_RUNTIME_DIR は絶対パスで指定してください。"
     [[ -f "${APP_CONFIG}" ]] || fail "ローカルDB設定がありません: ${APP_CONFIG}"
+    [[ -r "${SCHEMA_FILE}" ]] || fail "スキーマを読み込めません: ${SCHEMA_FILE}"
+    [[ -r "${PROFILE_TEST_DATA_FILE}" ]] \
+        || fail "プロフィール用テストデータを読み込めません: ${PROFILE_TEST_DATA_FILE}"
 }
 
 compose() {
@@ -75,6 +82,42 @@ compose() {
         --project-directory "${PROJECT_ROOT}" \
         -f "${COMPOSE_FILE}" \
         "$@"
+}
+
+database_query() {
+    compose exec -T database mariadb \
+        --batch --skip-column-names \
+        --user=osm --password=osm-local-test osm_whatnew \
+        --execute="$1"
+}
+
+apply_sql_file() {
+    compose exec -T database \
+        mariadb --user=osm --password=osm-local-test osm_whatnew <"$1"
+}
+
+prepare_test_database() {
+    local seed_version
+
+    info "ローカルDBへ最新スキーマを適用します。"
+    apply_sql_file "${SCHEMA_FILE}" >/dev/null
+
+    seed_version="$(database_query \
+        "SELECT COALESCE(MAX(state_value), '') FROM osm_sync_state WHERE state_key = 'profile_test_data_version'")"
+
+    if [[ "${seed_version}" != "${PROFILE_TEST_DATA_VERSION}" ]]; then
+        info "ローカルDBへプロフィール用テストデータを投入します。"
+        apply_sql_file "${PROFILE_TEST_DATA_FILE}"
+        info "プロフィール用テストデータを投入しました。"
+    else
+        info "プロフィール用テストデータは投入済みです。"
+    fi
+}
+
+refresh_test_profiles() {
+    info "プロフィール集計を更新します。"
+    OSM_APP_CONFIG="${APP_CONFIG}" OSM_TEST_DB_PORT="${MYSQL_PORT}" \
+        php "${DOCUMENT_ROOT}/profile-sync.php"
 }
 
 web_is_running() {
@@ -102,10 +145,17 @@ start_web() {
     fi
 
     info "作業ディレクトリを直接参照するPHP Webサーバーを起動します。"
-    OSM_APP_CONFIG="${APP_CONFIG}" OSM_TEST_DB_PORT="${MYSQL_PORT}" nohup php \
+    OSM_APP_CONFIG="${APP_CONFIG}" OSM_TEST_DB_PORT="${MYSQL_PORT}" \
+        start-stop-daemon \
+        --start \
+        --background \
+        --make-pidfile \
+        --pidfile "${WEB_PID_FILE}" \
+        --chdir "${PROJECT_ROOT}" \
+        --startas "$(command -v php)" \
+        -- \
         -S "${WEB_HOST}:${WEB_PORT}" \
-        -t "${DOCUMENT_ROOT}" >"${WEB_LOG_FILE}" 2>&1 &
-    printf '%s\n' "$!" >"${WEB_PID_FILE}"
+        -t "${DOCUMENT_ROOT}" >"${WEB_LOG_FILE}" 2>&1
 }
 
 wait_for_web() {
@@ -115,13 +165,15 @@ wait_for_web() {
         healthcheck_host="127.0.0.1"
     fi
     for attempt in {1..60}; do
-        if ! web_is_running; then
-            tail -n 30 "${WEB_LOG_FILE}" >&2 || true
-            fail "Webサーバーの起動に失敗しました。"
-        fi
-        if curl --fail --silent \
+        if web_is_running && curl --fail --silent \
             "http://${healthcheck_host}:${WEB_PORT}/api.php?mode=japan&days=1" >/dev/null; then
             return
+        fi
+        # The daemon can exist briefly before its command line changes to PHP.
+        # Allow a short startup grace period before treating the PID as dead.
+        if ((attempt >= 5)) && ! web_is_running; then
+            tail -n 30 "${WEB_LOG_FILE}" >&2 || true
+            fail "Webサーバーの起動に失敗しました。"
         fi
         sleep 1
     done
@@ -154,6 +206,8 @@ start_environment() {
     require_environment
     validate_settings
     compose up --detach --build --wait database phpmyadmin
+    prepare_test_database
+    refresh_test_profiles
     start_web
     wait_for_web
 
@@ -164,6 +218,7 @@ start_environment() {
     info "Document Root: ${DOCUMENT_ROOT}"
     info "phpMyAdmin: http://${PHPMYADMIN_HOST}:${PHPMYADMIN_PORT}/"
     info "DB: MariaDBコンテナ（127.0.0.1:${MYSQL_PORT}/osm_whatnew）"
+    info "プロフィール用テストデータは初回だけ自動投入します。"
     info "Webログ: ${WEB_LOG_FILE}"
 }
 
