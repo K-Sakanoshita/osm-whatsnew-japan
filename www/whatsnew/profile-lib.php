@@ -27,7 +27,7 @@ function profilePrefectureBadgeIcons(): array
         'tochigi' => '🍓', 'gunma' => '♨️', 'saitama' => '🍘', 'chiba' => '🥜',
         'tokyo' => '🗼', 'kanagawa' => '⚓', 'niigata' => '🍚', 'toyama' => '🦑',
         'ishikawa' => '✨', 'fukui' => '🦕', 'yamanashi' => '🍇', 'nagano' => '⛰️',
-        'gifu' => '🏘️', 'shizuoka' => '🗻', 'aichi' => '🏯', 'mie' => '🦐',
+        'gifu' => '🏘️', 'shizuoka' => '🍵', 'aichi' => '🏯', 'mie' => '🦐',
         'shiga' => '🏞️', 'kyoto' => '👘', 'osaka' => '🐙', 'hyogo' => '🥩',
         'nara' => '🦌', 'wakayama' => '🥾', 'tottori' => '🏜️', 'shimane' => '⛩️',
         'okayama' => '🍡', 'hiroshima' => '🦪', 'yamaguchi' => '🐡', 'tokushima' => '💃',
@@ -383,6 +383,7 @@ function profileMonthlyLevel(int $total): array
         100 => 'たくさんマッパー',
         250 => 'ものすごマッパー',
         500 => 'とんでもマッパー',
+        1000 => 'さいこうマッパー',
     ];
     $level = 0;
     $name = '';

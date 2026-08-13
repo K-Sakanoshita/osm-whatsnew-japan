@@ -2,12 +2,9 @@
 
 const numberFormat = new Intl.NumberFormat('ja-JP');
 const dateFormat = new Intl.DateTimeFormat('ja-JP', {year: 'numeric', month: 'short', day: 'numeric'});
-const dateTimeFormat = new Intl.DateTimeFormat('ja-JP', {
-  year: 'numeric', month: 'short', day: 'numeric',
-  hour: '2-digit', minute: '2-digit', hour12: false,
-  timeZone: 'Asia/Tokyo',
+const yearMonthFormat = new Intl.DateTimeFormat('ja-JP', {
+  year: 'numeric', month: 'long', timeZone: 'Asia/Tokyo',
 });
-const monthFormat = new Intl.DateTimeFormat('ja-JP', {year: 'numeric', month: 'short'});
 const statusElement = document.querySelector('#profile-status');
 const contentElement = document.querySelector('#profile-content');
 let apiUrl = '';
@@ -15,6 +12,8 @@ let categoryRules = {};
 let activityMap = null;
 let directoryMap = null;
 let prefectureGeoJsonPromise = null;
+let newlyEarnedBadgeKeys = new Set();
+let badgeEffectPlaying = false;
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -31,12 +30,8 @@ function formatDate(value) {
   return value ? dateFormat.format(parseUtc(value)) : '—';
 }
 
-function formatDateTime(value) {
-  return value ? dateTimeFormat.format(parseUtc(value)) : '—';
-}
-
-function formatMonth(value) {
-  return value ? monthFormat.format(parseUtc(value)) : '—';
+function formatYearMonth(value) {
+  return value ? yearMonthFormat.format(parseUtc(value)) : '—';
 }
 
 async function loadJsonc(path) {
@@ -62,20 +57,20 @@ function renderSummary(profile) {
     total_count: 0, create_count: 0, modify_count: 0, active_day_count: 0,
   };
   const target = document.querySelector('#profile-summary');
-  const total = element('article', 'summary-item summary-item-highlight');
+  const total = element('article', 'summary-item');
   const totalValue = element('strong');
   totalValue.append(
     element('span', 'summary-total-main', `${numberFormat.format(summary.total_count)}件`),
     element('span', 'summary-total-detail', `（新規${numberFormat.format(summary.create_count)}件/更新${numberFormat.format(summary.modify_count)}件）`),
   );
-  total.append(element('span', '', '更新地物'), totalValue);
+  total.append(element('span', '', '編集'), totalValue);
   const activeDays = element('article', 'summary-item');
   const activeDaysValue = element('strong');
   activeDaysValue.append(
     element('span', 'summary-total-main', `${numberFormat.format(summary.active_day_count)}日`),
     element('span', 'summary-total-detail', `（累積：${numberFormat.format(profile.active_day_count || 0)}日）`),
   );
-  activeDays.append(element('span', '', '活動日数'), activeDaysValue);
+  activeDays.append(element('span', '', '活動'), activeDaysValue);
   target.replaceChildren(
     total,
     activeDays,
@@ -83,12 +78,11 @@ function renderSummary(profile) {
 }
 
 function monthlyLevelPanel(level) {
-  const panel = element('article', 'summary-item summary-item-highlight');
+  const panel = element('article', 'summary-item');
   const levelText = element('strong');
   levelText.append(
     element('span', 'summary-total-main', `Lv.${level.level}`),
     element('span', 'summary-total-detail', level.name || '—'),
-    element('span', 'summary-total-detail', `今月 ${numberFormat.format(level.total)}件`),
   );
   panel.append(element('span', '', '月間'), levelText);
   return panel;
@@ -100,7 +94,6 @@ function renderStreaks(profile) {
   levelText.append(
     element('span', 'summary-total-main', `Lv.${profile.cumulativeLevel.level}`),
     element('span', 'summary-total-detail', profile.cumulativeLevel.name),
-    element('span', 'summary-total-detail', `直近1年間 ${numberFormat.format(profile.total_count)}件`),
   );
   cumulative.append(element('span', '', '累積'), levelText);
   document.querySelector('#profile-streaks').replaceChildren(
@@ -109,42 +102,77 @@ function renderStreaks(profile) {
   );
 }
 
-function badgeCard(badge) {
-  const card = element('article', 'profile-badge item-card');
+function badgeCard(badge, isNew = false) {
+  const card = element('article', `profile-badge item-card${isNew ? ' is-new' : ''}`);
+  card.dataset.badgeKey = badge.badgeKey;
   card.append(element('span', 'profile-badge-icon', badge.icon));
   const copy = element('div');
-  copy.append(element('strong', '', badge.name), element('p', '', badge.description));
-  const label = badge.acquisitionSource === 'backfill' ? '確認' : '取得';
-  copy.append(element('small', '', `${formatMonth(badge.earnedAt)}${label}・${formatMonth(badge.progressUpdatedAt)}更新`));
+  const name = element('strong', '', badge.name);
+  if (isNew) name.append(element('span', 'profile-badge-new-label', 'NEW'));
+  copy.append(name, element('p', '', badge.description));
   card.append(copy);
   return card;
 }
 
+const badgeLevelNumerals = {1: 'Ⅰ', 2: 'Ⅱ', 3: 'Ⅲ'};
+
 function badgeGuideItem(definition, earnedKeys) {
-  const item = element('article', `profile-badge-guide-item${earnedKeys.has(definition.badgeKey) ? ' is-earned' : ''}`);
+  const definitionKeys = definition.badgeKeys || [definition.badgeKey];
+  const earnedLevels = definitionKeys
+    .map((key, index) => earnedKeys.has(key) ? badgeLevelNumerals[index + 1] : '')
+    .filter(Boolean);
+  const isEarned = earnedLevels.length > 0;
+  const item = element('article', `profile-badge-guide-item${isEarned ? ' is-earned' : ''}`);
   item.append(element('span', 'profile-badge-guide-icon', definition.icon));
   const copy = element('div');
   copy.append(element('strong', '', definition.name), element('p', '', definition.description));
   item.append(copy);
-  if (earnedKeys.has(definition.badgeKey)) item.append(element('small', '', '取得済み'));
+  if (isEarned) {
+    const earnedLabel = definitionKeys.length > 1 ? `${earnedLevels.join('・')}取得済み` : '取得済み';
+    item.append(element('small', '', earnedLabel));
+  }
   return item;
+}
+
+function combinedBadgeDescription(definitions) {
+  const parsed = definitions.map(definition => String(definition.description || '')
+    .match(/^(.*?)([\d,]+)(件.*)$/));
+  if (parsed.every(Boolean)
+    && parsed.every(parts => parts[1] === parsed[0][1] && parts[3] === parsed[0][3])) {
+    const values = parsed.map(parts => parts[2]).join('件、');
+    return `${parsed[0][1]}${values}${parsed[0][3]}`;
+  }
+  return definitions.map(definition => definition.description).join('／');
+}
+
+function consolidatedBadgeDefinitions(definitions) {
+  const groups = new Map();
+  definitions.forEach(definition => {
+    const key = definition.badgeGroup || `badge:${definition.badgeKey}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(definition);
+  });
+  return [...groups.values()].map(group => {
+    if (!group[0].badgeGroup || group.length === 1) return group[0];
+    const ordered = [...group].sort((left, right) =>
+      Number(left.badgeLevel || 0) - Number(right.badgeLevel || 0));
+    const baseName = String(ordered[0].name || '').replace(/[ⅠⅡⅢ]+$/, '');
+    const levels = ordered.map(definition =>
+      badgeLevelNumerals[Number(definition.badgeLevel)] || definition.badgeLevel).join('・');
+    return {
+      ...ordered[0],
+      name: `${baseName}${levels}`,
+      description: combinedBadgeDescription(ordered),
+      badgeKeys: ordered.map(definition => definition.badgeKey),
+    };
+  });
 }
 
 function renderBadgeGuide(definitions, earnedBadges) {
   const list = document.querySelector('#profile-badge-guide-list');
   const earnedKeys = new Set(earnedBadges.map(badge => badge.badgeKey));
-  const primaryDefinitions = definitions.filter(definition => !definition.badgeGroup || Number(definition.badgeLevel) <= 1);
-  const advancedDefinitions = definitions.filter(definition => definition.badgeGroup && Number(definition.badgeLevel) > 1);
-  const items = primaryDefinitions.map(definition => badgeGuideItem(definition, earnedKeys));
-  if (advancedDefinitions.length) {
-    const details = element('details', 'profile-badge-guide-all-levels disclosure-panel');
-    details.append(element('summary', '', `Ⅱ・Ⅲを表示（${numberFormat.format(advancedDefinitions.length)}個）`));
-    const levelItems = element('div');
-    levelItems.append(...advancedDefinitions.map(definition => badgeGuideItem(definition, earnedKeys)));
-    details.append(levelItems);
-    items.push(details);
-  }
-  list.replaceChildren(...items);
+  const consolidated = consolidatedBadgeDefinitions(definitions);
+  list.replaceChildren(...consolidated.map(definition => badgeGuideItem(definition, earnedKeys)));
 }
 
 function badgeFamily(badge) {
@@ -152,6 +180,30 @@ function badgeFamily(badge) {
   if (badge.metric === 'prefecture_mapping_count') return 'prefecture';
   if (badge.metric === 'tag_group') return badge.badgeGroup || `badge:${badge.badgeKey}`;
   return badge.metric || `badge:${badge.badgeKey}`;
+}
+
+function consolidatedBadgeSeries(badges, newBadgeKeys) {
+  const groups = new Map();
+  badges.forEach(badge => {
+    const key = badge.badgeGroup || `badge:${badge.badgeKey}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(badge);
+  });
+  return [...groups.values()].map(group => {
+    if (!group[0].badgeGroup || group.length === 1) {
+      return {...group[0], isNew: newBadgeKeys.has(group[0].badgeKey)};
+    }
+    const ordered = [...group].sort((left, right) =>
+      Number(left.badgeLevel || 0) - Number(right.badgeLevel || 0));
+    const highest = ordered.at(-1);
+    const baseName = String(ordered[0].name || '').replace(/[ⅠⅡⅢ]+$/, '');
+    const levels = ordered.map(badge => badgeLevelNumerals[Number(badge.badgeLevel)] || badge.badgeLevel).join('・');
+    return {
+      ...highest,
+      name: `${baseName}${levels}`,
+      isNew: ordered.some(badge => newBadgeKeys.has(badge.badgeKey)),
+    };
+  });
 }
 
 function prioritizedBadges(badges, visibleLimit = 6) {
@@ -166,9 +218,11 @@ function prioritizedBadges(badges, visibleLimit = 6) {
     balanced_count: 40,
     prefecture: 30,
   };
-  const familyPriority = badge => badge.metric === 'tag_group'
-    ? 45
-    : (familyPriorities[badgeFamily(badge)] || 0);
+  const familyPriority = badge => {
+    if (badge.metric === 'tag_group') return 45;
+    if (badge.metric === 'active_day_count' && Number(badge.threshold || 0) <= 30) return 25;
+    return familyPriorities[badgeFamily(badge)] || 0;
+  };
   const compareWithinFamily = (left, right) =>
     Number(right.threshold || 0) - Number(left.threshold || 0)
       || String(right.earnedAt || '').localeCompare(String(left.earnedAt || ''))
@@ -199,13 +253,19 @@ function prioritizedBadges(badges, visibleLimit = 6) {
   return {visible, hidden};
 }
 
-function renderBadges(data) {
+function renderBadges(data, newBadgeKeys = new Set()) {
   renderBadgeGuide(data.badgeDefinitions || [], data.badges);
   document.querySelector('#profile-badge-count').textContent = `${data.badges.length}個獲得`;
   const badges = document.querySelector('#profile-badges');
-  const sortedBadges = [...data.badges];
-  const {visible: recentBadges, hidden: olderBadges} = prioritizedBadges(sortedBadges);
-  badges.replaceChildren(...recentBadges.map(badgeCard));
+  const sortedBadges = consolidatedBadgeSeries(data.badges, newBadgeKeys);
+  const prioritized = prioritizedBadges(sortedBadges);
+  const newBadges = sortedBadges.filter(badge => badge.isNew);
+  const remainingBadges = [...prioritized.visible, ...prioritized.hidden]
+    .filter(badge => !badge.isNew);
+  const recentBadges = [...newBadges, ...remainingBadges].slice(0, 6);
+  const visibleKeys = new Set(recentBadges.map(badge => badge.badgeKey));
+  const olderBadges = [...newBadges, ...remainingBadges].filter(badge => !visibleKeys.has(badge.badgeKey));
+  badges.replaceChildren(...recentBadges.map(badge => badgeCard(badge, badge.isNew)));
   if (!sortedBadges.length) badges.append(element('p', 'profile-empty', '獲得済みバッジはまだありません。'));
 
   const older = document.querySelector('#profile-older-badges');
@@ -214,7 +274,7 @@ function renderBadges(data) {
   if (olderBadges.length) {
     const summary = element('summary', '', `他のバッジを表示（${numberFormat.format(olderBadges.length)}個）`);
     const grid = element('div', 'profile-badges profile-older-badges-grid item-grid');
-    grid.append(...olderBadges.map(badgeCard));
+    grid.append(...olderBadges.map(badge => badgeCard(badge, badge.isNew)));
     older.append(summary, grid);
     older.addEventListener('toggle', () => {
       summary.textContent = older.open
@@ -239,18 +299,81 @@ function renderBadges(data) {
   });
 }
 
-const badgeGuideDialog = document.querySelector('#profile-badge-guide');
-document.querySelector('#profile-badge-guide-open').addEventListener('click', () => {
-  if (!badgeGuideDialog.open) {
-    document.body.classList.add('is-badge-guide-open');
-    badgeGuideDialog.showModal();
+async function playNewBadgeEffect() {
+  const cards = [...document.querySelectorAll('#profile-badges > .profile-badge.is-new')];
+  if (!cards.length || badgeEffectPlaying) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  badgeEffectPlaying = true;
+  const backdrop = element('div', 'profile-badge-effect-backdrop');
+  backdrop.append(element('strong', 'profile-badge-effect-title', '新規バッチ獲得！'));
+  document.body.append(backdrop);
+  try {
+    for (const card of cards) {
+      const rect = card.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      const clone = card.cloneNode(true);
+      clone.classList.add('profile-badge-effect-clone');
+      Object.assign(clone.style, {
+        top: `${rect.top}px`, left: `${rect.left}px`,
+        width: `${rect.width}px`, height: `${rect.height}px`,
+      });
+      document.body.append(clone);
+      card.style.visibility = 'hidden';
+      const moveX = innerWidth / 2 - (rect.left + rect.width / 2);
+      const moveY = innerHeight / 2 - (rect.top + rect.height / 2);
+      const scale = Math.max(1, Math.min(
+        1.75,
+        (innerWidth - 40) / rect.width,
+        (innerHeight - 40) / rect.height,
+      ));
+      const center = `translate(${moveX}px, ${moveY}px) scale(${scale})`;
+      const animation = clone.animate([
+        {transform: 'translate(0, 0) scale(.9)', opacity: .35, offset: 0, easing: 'cubic-bezier(.08,.8,.12,1)'},
+        {transform: `${center} rotate(-.6deg)`, opacity: 1, offset: .22, easing: 'cubic-bezier(.2,.75,.25,1)'},
+        {transform: `${center} rotate(.4deg)`, opacity: 1, offset: .58, easing: 'cubic-bezier(.55,.05,.72,.35)'},
+        {transform: 'translate(0, 0) scale(.94)', opacity: 1, offset: .88, easing: 'cubic-bezier(.12,.75,.25,1)'},
+        {transform: 'translate(0, 0) scale(1)', opacity: 1, offset: 1},
+      ], {duration: 1450, fill: 'both'});
+      try { await animation.finished; } catch { /* A repeated navigation may cancel it. */ }
+      clone.remove();
+      card.style.removeProperty('visibility');
+      await new Promise(resolve => window.setTimeout(resolve, 100));
+    }
+  } finally {
+    backdrop.remove();
+    document.querySelectorAll('.profile-badge-effect-clone').forEach(clone => clone.remove());
+    document.querySelectorAll('.profile-badge.is-new').forEach(card => card.style.removeProperty('visibility'));
+    badgeEffectPlaying = false;
   }
-});
-document.querySelector('#profile-badge-guide-close').addEventListener('click', () => badgeGuideDialog.close());
-badgeGuideDialog.addEventListener('click', event => {
-  if (event.target === badgeGuideDialog) badgeGuideDialog.close();
-});
-badgeGuideDialog.addEventListener('close', () => document.body.classList.remove('is-badge-guide-open'));
+}
+
+function replayNewBadgeEffect() {
+  if (badgeEffectPlaying) return;
+  document.querySelector('#profile-badges')?.scrollIntoView({behavior: 'smooth', block: 'center'});
+  window.setTimeout(playNewBadgeEffect, 500);
+}
+
+document.querySelector('#profile-replay-badges').addEventListener('click', replayNewBadgeEffect);
+
+function setupProfileGuideDialog(triggerSelector, dialogSelector, closeSelector) {
+  const trigger = document.querySelector(triggerSelector);
+  const dialog = document.querySelector(dialogSelector);
+  const closeButton = document.querySelector(closeSelector);
+  trigger.addEventListener('click', () => {
+    if (!dialog.open) {
+      document.body.classList.add('is-badge-guide-open');
+      dialog.showModal();
+    }
+  });
+  closeButton.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener('close', () => document.body.classList.remove('is-badge-guide-open'));
+}
+
+setupProfileGuideDialog('#profile-level-guide-open', '#profile-level-guide', '#profile-level-guide-close');
+setupProfileGuideDialog('#profile-badge-guide-open', '#profile-badge-guide', '#profile-badge-guide-close');
 
 function renderBars(selector, rows, label) {
   const target = document.querySelector(selector);
@@ -381,30 +504,40 @@ function featureBounds(feature) {
   return bounds;
 }
 
-function mapperListItem(row, index) {
+function mapperListItem(row, index, showBreakdown = true) {
   const item = element('li');
   const link = element('a');
   link.href = `profile.html?uid=${encodeURIComponent(row.uid)}`;
   const rank = element('span', 'profile-directory-rank', String(index + 1));
   const avatar = element('span', 'profile-related-avatar', String(row.name || '?').slice(0, 1).toUpperCase());
+  if (row.avatarUrl) {
+    const image = element('img');
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.addEventListener('load', () => avatar.classList.add('has-image'));
+    image.addEventListener('error', () => image.remove());
+    image.src = row.avatarUrl;
+    avatar.append(image);
+  }
   const copy = element('span', 'profile-directory-mapper');
-  copy.append(
-    element('strong', '', row.name || '不明'),
-    element('small', '', `新規 ${numberFormat.format(row.creates)}件・更新 ${numberFormat.format(row.modifies)}件`),
-  );
+  copy.append(element('strong', '', row.name || '不明'));
+  if (showBreakdown) {
+    copy.append(element('small', '', `新規 ${numberFormat.format(row.creates)}件・更新 ${numberFormat.format(row.modifies)}件`));
+  }
   link.append(rank, avatar, copy, element('b', '', `${numberFormat.format(row.total)}件`));
   item.append(link);
   return item;
 }
 
 function renderDirectoryMappers(prefecture, rows) {
-  const areaLabel = prefecture || '日本';
   const results = document.querySelector('#profile-directory-results');
   const list = document.querySelector('#profile-directory-list');
-  document.querySelector('#profile-directory-title').textContent = `${areaLabel}のトップ100マッパー`;
-  document.querySelector('#profile-directory-count').textContent = `${numberFormat.format(rows.length)}人`;
+  document.querySelector('#profile-directory-title').textContent = '最近更新したマッパー';
+  document.querySelector('#profile-directory-count').textContent = '';
   document.querySelector('#profile-directory-status').textContent = rows.length
-    ? '直近1年間に確認できた対象地物数の順です。'
+    ? `${prefecture ? `${prefecture}で活動したマッパーを、` : ''}最終活動日時が新しい順に表示しています。`
     : '表示できるマッパーがいません。';
   list.replaceChildren(...rows.map(mapperListItem));
   results.hidden = false;
@@ -541,10 +674,9 @@ function initializeMapperSearch() {
 }
 
 async function loadDirectoryMappers(prefecture, {scroll = true} = {}) {
-  const areaLabel = prefecture || '日本';
   const results = document.querySelector('#profile-directory-results');
   const status = document.querySelector('#profile-directory-status');
-  document.querySelector('#profile-directory-title').textContent = `${areaLabel}のトップ100マッパー`;
+  document.querySelector('#profile-directory-title').textContent = '最近更新したマッパー';
   document.querySelector('#profile-directory-count').textContent = '';
   document.querySelector('#profile-directory-list').replaceChildren();
   status.textContent = 'マッパーを読み込んでいます…';
@@ -593,17 +725,38 @@ async function initializeDirectory() {
       paint: {'fill-color': '#38a37d', 'fill-opacity': .18, 'fill-outline-color': '#35674f'},
     }, firstSymbolLayer);
     directoryMap.addLayer({
+      id: 'profile-directory-prefecture-outline',
+      type: 'line',
+      source: 'profile-directory-prefectures',
+      paint: {
+        'line-color': '#285b47',
+        'line-width': 1,
+        'line-opacity': .9,
+      },
+    }, firstSymbolLayer);
+    directoryMap.addLayer({
       id: 'profile-directory-prefecture-selected',
       type: 'fill',
       source: 'profile-directory-prefectures',
       filter: ['==', ['coalesce', ['get', 'name:ja'], ['get', 'name']], ''],
-      paint: {'fill-color': '#087f5b', 'fill-opacity': .5, 'fill-outline-color': '#075f47'},
+      paint: {'fill-color': '#087f5b', 'fill-opacity': .5},
+    }, firstSymbolLayer);
+    directoryMap.addLayer({
+      id: 'profile-directory-prefecture-selected-outline',
+      type: 'line',
+      source: 'profile-directory-prefectures',
+      filter: ['==', ['coalesce', ['get', 'name:ja'], ['get', 'name']], ''],
+      paint: {
+        'line-color': '#f05a24',
+        'line-width': 2,
+      },
     }, firstSymbolLayer);
     directoryMap.on('click', 'profile-directory-prefecture-fill', event => {
       const feature = event.features?.[0];
       const name = prefectureName(feature);
       if (!name) return;
       directoryMap.setFilter('profile-directory-prefecture-selected', ['==', ['coalesce', ['get', 'name:ja'], ['get', 'name']], name]);
+      directoryMap.setFilter('profile-directory-prefecture-selected-outline', ['==', ['coalesce', ['get', 'name:ja'], ['get', 'name']], name]);
       const bounds = featureBounds(feature);
       if (!bounds.isEmpty()) directoryMap.fitBounds(bounds, {padding: 45, maxZoom: 7, duration: 500});
       loadDirectoryMappers(name).catch(error => {
@@ -621,34 +774,85 @@ function osmObjectUrl(row) {
 
 function renderRecent(rows) {
   const target = document.querySelector('#profile-recent');
+  target.classList.remove('is-expanded');
   target.replaceChildren(...rows.map(row => {
     const item = element('article');
     const action = element('span', `profile-action is-${row.action}`, row.action === 'create' ? '新規' : '更新');
     const copy = element('div');
     const link = element('a', '', row.name || categoryLabel(row));
     link.href = osmObjectUrl(row); link.target = '_blank'; link.rel = 'noopener noreferrer';
-    copy.append(link, element('small', '', `${row.prefecture || '地域不明'}・${formatDateTime(row.date)}`));
+    copy.append(link, element('small', '', `${row.prefecture || '地域不明'}・${formatYearMonth(row.date)}`));
     item.append(action, copy);
     return item;
   }));
+  const morePanel = document.querySelector('#profile-recent-more');
+  const hiddenCount = Math.max(0, rows.length - 6);
+  morePanel.hidden = hiddenCount === 0;
+  morePanel.open = false;
+  morePanel.querySelector('summary').textContent = `続きを表示（${numberFormat.format(hiddenCount)}件）`;
 }
+
+document.querySelector('#profile-recent-more').addEventListener('toggle', event => {
+  const target = document.querySelector('#profile-recent');
+  const expanded = event.currentTarget.open;
+  target.classList.toggle('is-expanded', expanded);
+  event.currentTarget.querySelector('summary').textContent = expanded
+    ? '閉じる'
+    : `続きを表示（${numberFormat.format(Math.max(0, target.children.length - 6))}件）`;
+});
 
 function renderRelated(rows) {
   const target = document.querySelector('#profile-related');
-  target.replaceChildren(...rows.map(mapperListItem));
+  target.replaceChildren(...rows.map((row, index) => mapperListItem(row, index, false)));
   if (!rows.length) target.append(element('li', 'profile-empty', '関連するマッパーはまだ見つかりません。'));
 }
+
+function previousBadgeKeys(uid) {
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(`osm-profile-${uid}`) || 'null');
+    return Array.isArray(snapshot?.badgeKeys) ? new Set(snapshot.badgeKeys.map(String)) : null;
+  } catch {
+    return null;
+  }
+}
+
+window.clearProfileBadgeHistory = function clearProfileBadgeHistory() {
+  const uid = new URLSearchParams(location.search).get('uid')?.trim() || '';
+  if (!/^[1-9]\d*$/.test(uid)) {
+    console.warn('UIDを指定したプロフィールページで実行してください。');
+    return false;
+  }
+  try {
+    const key = `osm-profile-${uid}`;
+    const snapshot = JSON.parse(localStorage.getItem(key) || '{}');
+    snapshot.badgeKeys = [];
+    snapshot.badges = 0;
+    localStorage.setItem(key, JSON.stringify(snapshot));
+    location.reload();
+    return true;
+  } catch (error) {
+    console.error('バッジ所持情報をクリアできませんでした。', error);
+    return false;
+  }
+};
 
 function rememberSnapshot(data) {
   try {
     localStorage.setItem(`osm-profile-${data.profile.editor_uid}`, JSON.stringify({
-      total: data.profile.total_count, badges: data.badges.length, calculatedAt: data.meta.calculatedAt,
+      total: data.profile.total_count,
+      badges: data.badges.length,
+      badgeKeys: data.badges.map(badge => badge.badgeKey),
+      calculatedAt: data.meta.calculatedAt,
     }));
   } catch { /* Storage is optional. */ }
 }
 
 function renderProfile(data) {
   const profile = data.profile;
+  const previousKeys = previousBadgeKeys(profile.editor_uid);
+  newlyEarnedBadgeKeys = previousKeys === null
+    ? new Set()
+    : new Set(data.badges.map(badge => badge.badgeKey).filter(key => !previousKeys.has(key)));
   document.title = `${profile.editor_name}｜マッパープロフィール｜OSM What’s New Japan`;
   document.querySelector('#profile-name').textContent = profile.editor_name;
   const avatar = document.querySelector('#profile-avatar');
@@ -675,7 +879,12 @@ function renderProfile(data) {
   document.querySelector('#profile-region-count').textContent = `${numberFormat.format(profile.prefecture_count)}地域`;
   renderSummary(profile);
   renderStreaks(profile);
-  renderBadges(data);
+  renderBadges(data, newlyEarnedBadgeKeys);
+  const replayButton = document.querySelector('#profile-replay-badges');
+  replayButton.hidden = newlyEarnedBadgeKeys.size === 0;
+  replayButton.textContent = newlyEarnedBadgeKeys.size > 1
+    ? `もう一度見る（${numberFormat.format(newlyEarnedBadgeKeys.size)}個）`
+    : 'もう一度見る';
   renderBars('#profile-categories', data.categories, categoryLabel);
   renderRecent(data.recent);
   renderRelated(data.relatedMappers);
@@ -697,6 +906,7 @@ async function loadProfile(uid) {
   renderProfile(data);
   statusElement.hidden = true;
   contentElement.hidden = false;
+  if (newlyEarnedBadgeKeys.size) window.setTimeout(playNewBadgeEffect, 150);
   try {
     await renderActivityMap(data.prefectures);
   } catch (error) {

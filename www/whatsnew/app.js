@@ -1,4 +1,15 @@
 const mapPageUrl = new URL(window.location.href);
+const indexIntro = document.querySelector('.index-intro');
+const indexIntroClose = document.querySelector('#index-intro-close');
+const INDEX_INTRO_SESSION_KEY = 'osm-index-intro-closed';
+try {
+  if (sessionStorage.getItem(INDEX_INTRO_SESSION_KEY) === '1') indexIntro.hidden = true;
+} catch { /* Session storage is optional. */ }
+indexIntroClose?.addEventListener('click', () => {
+  indexIntro.hidden = true;
+  try { sessionStorage.setItem(INDEX_INTRO_SESSION_KEY, '1'); } catch { /* Session storage is optional. */ }
+  window.setTimeout(() => map.resize(), 0);
+});
 const WIDE_MAP_BOUNDS = [[115, 4], [155, 46]];
 const MAP_MOVEMENT_BOUNDS = [[110, 2], [170, 60]];
 const WIDE_MAP_CENTER = [135, 32.5];

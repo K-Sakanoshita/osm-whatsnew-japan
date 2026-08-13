@@ -901,6 +901,35 @@ button {
 }
 
 
+.map-guide-data-use {
+  margin-top: 22px;
+  padding: 18px 18px 16px;
+  border-top: 3px solid #397b69;
+  border-radius: 0 0 10px 10px;
+  background: #f2f7f5
+}
+
+
+.map-guide-data-use h3,
+.map-guide-data-use p {
+  margin: 0
+}
+
+
+.map-guide-data-use h3 {
+  color: #174f40;
+  font-size: 16px
+}
+
+
+.map-guide-data-use p {
+  margin-top: 10px;
+  color: #40564f;
+  font-size: 12px;
+  line-height: 1.75
+}
+
+
 .map-guide-about p {
   margin: 0;
   font-size: 13px;
@@ -942,6 +971,13 @@ button {
 .map-guide-about .map-guide-operator {
   margin-top: 14px;
   color: #40564f;
+  font-size: 12px
+}
+
+
+.map-guide-about .map-guide-disclaimer {
+  margin-top: 10px;
+  color: #60736e;
   font-size: 12px
 }
 

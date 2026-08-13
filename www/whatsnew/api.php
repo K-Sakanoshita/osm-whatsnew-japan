@@ -211,7 +211,7 @@ try {
                         total_count AS total, create_count AS creates,
                         modify_count AS `modifies`, last_activity_at AS lastActivityAt
                   FROM mapper_profile_stats
-                  ORDER BY total_count DESC, editor_name, editor_uid
+                  ORDER BY last_activity_at DESC, total_count DESC, editor_name, editor_uid
                   LIMIT 100',
                 []
             );
@@ -224,7 +224,8 @@ try {
                    FROM mapper_profile_prefectures area
                    JOIN mapper_profile_stats stats ON stats.editor_uid = area.editor_uid
                   WHERE area.prefecture = :prefecture
-                  ORDER BY area.total_count DESC, stats.editor_name, area.editor_uid
+                  ORDER BY stats.last_activity_at DESC, area.total_count DESC,
+                           stats.editor_name, area.editor_uid
                   LIMIT 100',
                 ['prefecture' => $prefecture]
             );
@@ -397,13 +398,14 @@ try {
                     change_action AS action, latitude AS lat, longitude AS lon
                FROM osm_poi
               WHERE editor_uid = :editor_uid
-              ORDER BY osm_timestamp DESC LIMIT 20',
+              ORDER BY osm_timestamp DESC LIMIT 18',
             ['editor_uid' => $editorUidText]
         );
 
         $related = $fetchAll(
             $pdo,
             'SELECT candidate.editor_uid AS uid, candidate.editor_name AS name,
+                    candidate_avatar.avatar_url AS avatarUrl,
                     candidate.total_count AS total, candidate.create_count AS creates,
                     candidate.modify_count AS `modifies`,
                     SUM(LEAST(candidate_pref.total_count, own_pref.total_count)) AS sharedScore,
@@ -413,9 +415,12 @@ try {
                  ON candidate_pref.prefecture = own_pref.prefecture
                 AND candidate_pref.editor_uid <> own_pref.editor_uid
                JOIN mapper_profile_stats candidate ON candidate.editor_uid = candidate_pref.editor_uid
+               LEFT JOIN mapper_profile_avatars candidate_avatar
+                 ON candidate_avatar.editor_uid = candidate.editor_uid
               WHERE own_pref.editor_uid = :editor_uid
               GROUP BY candidate.editor_uid, candidate.editor_name, candidate.total_count,
-                       candidate.create_count, candidate.modify_count, candidate.last_activity_at
+                       candidate.create_count, candidate.modify_count, candidate.last_activity_at,
+                       candidate_avatar.avatar_url
               ORDER BY sharedScore DESC,
                        CRC32(CONCAT(candidate.editor_uid, CURDATE(), :editor_uid_sort))
               LIMIT 9',
