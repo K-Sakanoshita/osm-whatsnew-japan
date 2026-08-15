@@ -1,0 +1,141 @@
+.app-modal-trigger {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #c8dad2;
+  border-radius: 50%;
+  background: #f1f8f5;
+  color: #315248;
+  font-size: 15px;
+  cursor: pointer
+}
+
+.app-modal {
+  width: min(720px, calc(100% - 28px));
+  height: min(78vh, 760px);
+  max-height: min(78vh, 760px);
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: #263b33;
+  box-shadow: 0 18px 55px rgba(12, 45, 35, .28)
+}
+
+.app-modal[open] {
+  display: flex;
+  flex-direction: column
+}
+
+.app-modal::backdrop {
+  background: rgba(17, 42, 34, .56)
+}
+
+.app-modal-heading {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #dce8e2;
+  background: #fff
+}
+
+.app-modal-heading>div {
+  min-width: 0
+}
+
+.app-modal-heading h2,
+.app-modal-heading p {
+  margin: 0
+}
+
+.app-modal-heading h2 {
+  color: #155e4a;
+  font-size: 21px
+}
+
+.app-modal-heading p {
+  margin-top: 6px;
+  color: #667a72;
+  font-size: 12px;
+  line-height: 1.6
+}
+
+.app-modal-close {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #eef5f2;
+  color: #315248;
+  font-size: 24px;
+  cursor: pointer
+}
+
+.app-modal-close:hover {
+  background: #e1eee8;
+  color: #075f49
+}
+
+.app-modal-close svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round
+}
+
+.app-modal-close:focus-visible,
+.app-modal-footer button:focus-visible {
+  outline: 3px solid rgba(8, 127, 91, .28);
+  outline-offset: 2px
+}
+
+.app-modal-body {
+  min-height: 0;
+  padding: 20px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain
+}
+
+.app-modal-footer {
+  flex: 0 0 auto;
+  padding: 15px 22px 18px;
+  border-top: 1px solid #dce8e2;
+  background: #fff
+}
+
+.app-modal-footer button {
+  width: 100%;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #155e4a;
+  color: #fff;
+  cursor: pointer
+}
+
+@media(max-width:700px) {
+  .app-modal {
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px);
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: auto;
+    border-radius: 16px
+  }
+
+  .app-modal-heading { padding: 16px 16px 13px }
+  .app-modal-body { padding: 16px }
+  .app-modal-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) }
+}

@@ -94,6 +94,7 @@ const timeEnd = document.querySelector('#time-end');
 const prefectureFilter = document.querySelector('#prefecture-filter');
 const prefectureFilterToggle = document.querySelector('#prefecture-filter-toggle');
 const timelineStep = document.querySelector('#timeline-step');
+const mapMarkerLegend = document.querySelector('#map-marker-legend');
 const poiActionFilterSelect = document.querySelector('#poi-action-filter');
 const days = document.querySelector('#days');
 if ([...days.options].some(option => option.value === requestedDaysValue)) days.value = requestedDaysValue;
@@ -778,6 +779,13 @@ function updateTimelineSummary() {
     timelineSummaryDatetime.removeAttribute('title');
   }
   timelineSummaryCount.textContent = '0件（累積0件）';
+}
+
+function updateMapLegend() {
+  if (!mapMarkerLegend) return;
+  const clusterMode = !demoCanvas && map.getZoom() <= LAYER_SWITCH_ZOOM;
+  mapMarkerLegend.dataset.displayMode = clusterMode ? 'clusters' : 'icons';
+  mapMarkerLegend.setAttribute('aria-label', clusterMode ? '集約表示の凡例' : 'アイコン表示の凡例');
 }
 
 const parseUtcDate = value => {
@@ -1860,7 +1868,12 @@ function showOsmMenu(entry, syncList = true) {
 
 function setupTimeline(items) {
   if (!items.length) {
-    timeline.hidden = true;
+    // Keep the summary and the 操作 button available so the period can be
+    // changed even when the current selection has no POIs.
+    timeline.hidden = false;
+    range.disabled = true;
+    timelinePlayButtons.forEach(button => { button.disabled = true; });
+    status.classList.add('is-empty-period');
     pendingSharedTime = null;
     return false;
   }
@@ -1885,6 +1898,8 @@ function setupTimeline(items) {
   timeEnd.textContent = fmt(max);
   // Keep the timeline hidden until the POI source has finished rendering.
   range.disabled = false;
+  timelinePlayButtons.forEach(button => { button.disabled = false; });
+  status.classList.remove('is-empty-period');
   if (demoCanvas) {
     setupDemoRuler();
     demoStartedAt = performance.now();
@@ -2052,6 +2067,7 @@ function ensurePoiLayers() {
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
     map.on('zoomend', () => {
+      updateMapLegend();
       if (map.getZoom() <= LAYER_SWITCH_ZOOM && markerEntries.length) {
         updateClusterData(upperBound(Number(range.value)), true);
       }
@@ -2162,6 +2178,7 @@ async function show(items) {
   demoModeButton.disabled = false;
   timelineResetButton.disabled = false;
   timeline.hidden = false;
+  updateMapLegend();
   void hydrateMapIcons(markerEntries, currentRender).catch(error => console.error('地図アイコンを読み込めませんでした:', error));
   if (!demoCanvas && (!selectedPrefecture || requestedAutomaticPlayback)) requestAutomaticPlayback();
 }
@@ -2173,6 +2190,7 @@ async function load() {
   activeLoadController = controller;
   renderVersion++;
   status.hidden = false;
+  status.classList.remove('is-empty-period');
   status.textContent = '保存済みデータを読み込み中…';
   poiTypeSelect.disabled = true;
   timeline.hidden = true;

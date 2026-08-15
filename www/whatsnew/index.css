@@ -502,6 +502,40 @@
   line-height: 1
 }
 
+.index-page .map-legend-icons,
+.index-page .map-legend-clusters {
+  gap: 10px
+}
+
+.index-page .map-legend-icons,
+.index-page .map-legend-clusters,
+.index-page .map-marker-legend-item {
+  display: inline-flex;
+  align-items: center
+}
+
+.index-page .map-marker-legend[data-display-mode="icons"] .map-legend-clusters,
+.index-page .map-marker-legend[data-display-mode="clusters"] .map-legend-icons {
+  display: none
+}
+
+.index-page .map-legend-cluster {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #78909c;
+  box-shadow: 0 1px 2px rgba(24, 54, 44, .2);
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1
+}
+
+.index-page .map-legend-cluster { width: 26px; height: 26px }
+
 
 .index-page .map-marker-legend-item svg {
   width: 15px;
@@ -1059,7 +1093,7 @@
   position: absolute;
   z-index: 4;
   bottom: 16px;
-  left: 16px;
+  left: 10px;
   display: flex;
   gap: 8px
 }
@@ -1554,6 +1588,8 @@
 
 /* モバイル地物ポップアップ */
 @media(max-width:700px) {
+  .index-page .map-action-buttons { left: 8px }
+
   .index-page .map-top-left-overlays {
     top: 8px;
     left: 8px;
@@ -1628,4 +1664,12 @@
     font-size: 11px
   }
 
+}
+
+/* Keep the empty-period message clear of the summary controls. */
+.index-page .loading-status.is-empty-period {
+  top: auto;
+  bottom: 10px;
+  min-height: 0;
+  pointer-events: none
 }

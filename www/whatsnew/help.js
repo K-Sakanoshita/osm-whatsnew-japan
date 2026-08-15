@@ -36,57 +36,23 @@
   if (!trigger) return;
 
   const STORAGE_KEY = 'osm-whatsnew-guide-v1';
-  const dialog = document.createElement('dialog');
-  dialog.id = 'map-guide-dialog';
-  dialog.className = 'map-guide-dialog';
-  dialog.setAttribute('aria-labelledby', 'map-guide-title');
-  dialog.setAttribute('aria-describedby', 'map-guide-intro');
-  dialog.innerHTML = `
-    <div class="map-guide-panel">
-      <div class="map-guide-header">
-        <div class="map-guide-title">
-          <img src="image/site.png" width="480" height="480" alt="">
-          <h2 id="map-guide-title">OSM What’s New Japanについて</h2>
-        </div>
-        <button class="map-guide-close" type="button" aria-label="ガイドを閉じる" title="閉じる">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-        </button>
-      </div>
-      <div class="map-guide-body">
+  const dialog = window.OSMModal.createDialog({
+    className: 'app-modal',
+    labelledBy: 'map-guide-title',
+    describedBy: 'map-guide-intro',
+    content: `
+      <div class="app-modal-heading app-modal-guide-heading"><div class="map-guide-title"><img src="image/site.png" width="480" height="480" alt=""><h2 id="map-guide-title">OSM What’s New Japanについて</h2></div></div>
+      <div class="app-modal-body">
         <p id="map-guide-intro" class="map-guide-intro">OpenStreetMapで日本国内に追加・編集された地物を、地図・分析・密度の画面とマッパー別プロフィールで確認できるWebアプリケーションです。</p>
-        <ul class="map-guide-list">
-          <li><img class="map-guide-image" src="image/map.png" width="1254" height="1254" alt=""><span><strong>地図</strong>新規作成（緑）・更新（オレンジ）の地物を表示し、時刻に沿って再生</span></li>
-          <li><img class="map-guide-image" src="image/report.png" width="1254" height="1254" alt=""><span><strong>分析</strong>都道府県、タグ、編集者、日付、変更セット別に集計</span></li>
-          <li><span class="map-guide-symbol" aria-hidden="true">▦</span><span><strong>密度</strong>選択期間に更新された地物を約1kmメッシュ単位で表示</span></li>
-          <li><span class="map-guide-symbol" aria-hidden="true">♙</span><span><strong>マッパー</strong>直近1年間の活動、継続レベル、獲得バッジをマッパー別に表示</span></li>
-        </ul>
-        <p class="map-guide-scope">タグ付きノードに加え、対象タグを持つwayとmultipolygon relationを対象としています。</p>
-        <p class="map-guide-note"><strong>時刻について</strong>OSMへの登録・更新時刻を示すもので、施設の開業日や現実世界での変更日を示すものではありません。</p>
-        <section class="map-guide-data-use" aria-labelledby="map-guide-data-use-title">
-          <h3 id="map-guide-data-use-title">公開編集情報の取り扱い</h3>
-          <p>OSM What’s New Japanは、OpenStreetMapで公開されている編集情報を取得し、日本国内の地図更新状況を可視化・集計しています。</p>
-          <p>取得・表示する情報にはOpenStreetMapのユーザー名、ユーザーID、編集日時、変更セット、編集対象地物およびその位置等が含まれる場合があります。</p>
-          <p>これらの情報は、OpenStreetMapの更新状況の可視化・統計分析、およびマッパーごとの活動状況を表示する目的で利用します。</p>
-          <p>マッパープロフィールのレベル・バッジ・活動地域・カテゴリ等は、収集対象となった公開編集情報から自動的に算出されます。これらはマッパーの能力、信頼性またはOpenStreetMapにおける全活動を評価するものではありません。</p>
-        </section>
-        <section class="map-guide-about" aria-label="運営情報、APIとライセンス">
-          <p class="map-guide-about-description">地物を取得するAPIの使い方、利用できるクエリパラメーター、セットアップ方法、ソースコードをGitHubで公開しています。</p>
-          <a class="site-info-repository map-guide-repository" href="https://github.com/K-Sakanoshita/osm-whatsnew-japan" target="_blank" rel="noopener noreferrer">
-            <span>GitHubでAPIの使い方とソースコードを見る</span>
-            <small>K-Sakanoshita/osm-whatsnew-japan ↗</small>
-          </a>
-          <p class="map-guide-license">OpenStreetMapのデータはOpen Database License（ODbL）の下で提供されています。利用時は© OpenStreetMap contributorsの表示が必要です。</p>
-          <p class="map-guide-operator"><a href="https://k-sakanoshita.github.io/MyPortfolio/" target="_blank" rel="noopener noreferrer">制作・運営：坂ノ下 勝幸<span class="visually-hidden">（ポートフォリオを新しいタブで開く）</span></a><br>本サイトは個人が開発・運営しています。自分をプロフィール集計から除外してほしい場合はご連絡ください。</p>
-          <p class="map-guide-disclaimer">OpenStreetMap FoundationおよびOpenStreetMap Foundation Japanの公式サービスではありません。</p>
-        </section>
+        <ul class="map-guide-list"><li><img class="map-guide-image" src="image/map.png" width="1254" height="1254" alt=""><span><strong>地図</strong>新規作成（緑）・更新（オレンジ）の地物を表示し、時刻に沿って再生</span></li><li><img class="map-guide-image" src="image/report.png" width="1254" height="1254" alt=""><span><strong>分析</strong>都道府県、タグ、編集者、日付、変更セット別に集計</span></li><li><span class="map-guide-symbol" aria-hidden="true">▦</span><span><strong>密度</strong>選択期間に更新された地物を約1kmメッシュ単位で表示</span></li><li><span class="map-guide-symbol" aria-hidden="true">♙</span><span><strong>マッパー</strong>直近1年間の活動、継続レベル、獲得バッジをマッパー別に表示</span></li></ul>
+        <p class="map-guide-scope">タグ付きノードに加え、対象タグを持つwayとmultipolygon relationを対象としています。</p><p class="map-guide-note"><strong>時刻について</strong>OSMへの登録・更新時刻を示すもので、施設の開業日や現実世界での変更日を示すものではありません。</p>
+        <section class="map-guide-data-use" aria-labelledby="map-guide-data-use-title"><h3 id="map-guide-data-use-title">公開編集情報の取り扱い</h3><p>OSM What’s New Japanは、OpenStreetMapで公開されている編集情報を取得し、日本国内の地図更新状況を可視化・集計しています。</p><p>取得・表示する情報にはOpenStreetMapのユーザー名、ユーザーID、編集日時、変更セット、編集対象地物およびその位置等が含まれる場合があります。</p><p>これらの情報は、OpenStreetMapの更新状況の可視化・統計分析、およびマッパーごとの活動状況を表示する目的で利用します。</p><p>マッパープロフィールのレベル・バッジ・活動地域・カテゴリ等は、収集対象となった公開編集情報から自動的に算出されます。これらはマッパーの能力、信頼性またはOpenStreetMapにおける全活動を評価するものではありません。</p></section>
+        <section class="map-guide-about" aria-label="運営情報、APIとライセンス"><p class="map-guide-about-description">地物を取得するAPIの使い方、利用できるクエリパラメーター、セットアップ方法、ソースコードをGitHubで公開しています。</p><a class="site-info-repository map-guide-repository" href="https://github.com/K-Sakanoshita/osm-whatsnew-japan" target="_blank" rel="noopener noreferrer"><span>GitHubでAPIの使い方とソースコードを見る</span><small>K-Sakanoshita/osm-whatsnew-japan ↗</small></a><p class="map-guide-license">OpenStreetMapのデータはOpen Database License（ODbL）の下で提供されています。利用時は© OpenStreetMap contributorsの表示が必要です。</p><p class="map-guide-operator"><a href="https://k-sakanoshita.github.io/MyPortfolio/" target="_blank" rel="noopener noreferrer">制作・運営：坂ノ下 勝幸<span class="visually-hidden">（ポートフォリオを新しいタブで開く）</span></a><br>本サイトは個人が開発・運営しています。自分をプロフィール集計から除外してほしい場合はご連絡ください。</p><p class="map-guide-disclaimer">OpenStreetMap FoundationおよびOpenStreetMap Foundation Japanの公式サービスではありません。</p></section>
       </div>
-      <div class="map-guide-actions"><button class="map-guide-start" type="button">閉じる</button></div>
-    </div>
-  `;
-  document.body.append(dialog);
+      <div class="app-modal-footer"><button class="map-guide-start" type="button">閉じる</button></div>`,
+  });
 
   let openMode = '';
-  let returnFocus = trigger;
 
   function hasSeen() {
     try {
@@ -104,31 +70,33 @@
     }
   }
 
+  const modal = new window.OSMModal(dialog, {
+    beforeOpen() {
+      dialog.dispatchEvent(new CustomEvent('osm-guide-before-open', {detail: {mode: openMode}}));
+    },
+    afterClose() {
+      const closedMode = openMode;
+      openMode = '';
+      if (closedMode === 'automatic') rememberSeen();
+      dialog.dispatchEvent(new CustomEvent('osm-guide-closed', {detail: {mode: closedMode}}));
+    },
+  });
+
   function open({mode = 'manual', focusTarget = trigger} = {}) {
     if (dialog.open) return;
     openMode = mode;
-    returnFocus = focusTarget || trigger;
-    dialog.dispatchEvent(new CustomEvent('osm-guide-before-open', {detail: {mode}}));
-    dialog.showModal();
-    dialog.querySelector('.map-guide-close').focus();
+    modal.open({
+      returnFocus: focusTarget || trigger,
+      focusTarget: modal.closeButton,
+    });
   }
 
   function close() {
-    if (dialog.open) dialog.close();
+    modal.close();
   }
 
   trigger.addEventListener('click', () => open());
-  dialog.querySelector('.map-guide-close').addEventListener('click', close);
-  dialog.querySelector('.map-guide-start').addEventListener('click', close);
-  dialog.addEventListener('close', () => {
-    const closedMode = openMode;
-    const focusTarget = returnFocus;
-    openMode = '';
-    returnFocus = trigger;
-    if (closedMode === 'automatic') rememberSeen();
-    dialog.dispatchEvent(new CustomEvent('osm-guide-closed', {detail: {mode: closedMode}}));
-    requestAnimationFrame(() => focusTarget?.focus());
-  });
+  modal.bindClose('.map-guide-start');
 
   window.osmWhatsNewGuide = {dialog, hasSeen, open, close};
 })();

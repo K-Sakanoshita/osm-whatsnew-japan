@@ -3,6 +3,15 @@
 
 <head>
   <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-V4357J57C7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-V4357J57C7');
+  </script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>更新密度｜OSM What’s New Japan</title>
   <meta name="description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
@@ -25,7 +34,7 @@
   <meta name="twitter:description" content="OSM What’s New Japanが収集した対象地物を、約1kmの地図タイル単位で集計して表示します。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260812-2">
+  <link rel="stylesheet" href="style.css?v=20260814-1">
   <link rel="stylesheet" href="coverage.css?v=20260811-7">
 </head>
 
@@ -75,7 +84,8 @@
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
-  <script src="help.js?v=20260812-3"></script>
+  <script src="modal.js?v=20260814-7"></script>
+  <script src="help.js?v=20260814-5"></script>
   <script src="map-view.js?v=20260811-1"></script>
   <script>
     'use strict';

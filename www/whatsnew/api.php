@@ -331,6 +331,12 @@ try {
             ['editor_uid' => $editorUidText]
         );
         $definitions = profileBadgeDefinitions();
+        $badgeAwardCountRows = $pdo->query(
+            'SELECT badge_key, COUNT(*) AS award_count
+               FROM mapper_badges
+              WHERE revoked_at IS NULL
+              GROUP BY badge_key'
+        )->fetchAll(PDO::FETCH_KEY_PAIR);
         $badgeDefinitions = [];
         foreach ($definitions as $key => $definition) {
             $badgeDefinitions[] = [
@@ -338,6 +344,7 @@ try {
                 'name' => $definition['name'],
                 'description' => $definition['description'],
                 'icon' => $definition['icon'],
+                'awardCount' => (int) ($badgeAwardCountRows[$key] ?? 0),
                 'badgeGroup' => $definition['badge_group'] ?? null,
                 'badgeLevel' => $definition['badge_level'] ?? null,
             ];

@@ -175,11 +175,17 @@ function renderBadgeGuide(definitions, earnedBadges) {
   list.replaceChildren(...consolidated.map(definition => badgeGuideItem(definition, earnedKeys)));
 }
 
-function badgeFamily(badge) {
-  if (badge.metric === 'all_prefectures' || badge.metric === 'prefecture_count' || badge.metric === 'region_prefectures') return 'region_coverage';
-  if (badge.metric === 'prefecture_mapping_count') return 'prefecture';
-  if (badge.metric === 'tag_group') return badge.badgeGroup || `badge:${badge.badgeKey}`;
-  return badge.metric || `badge:${badge.badgeKey}`;
+function renderNextBadgeGuide(definitions) {
+  const list = nextBadgeGuideDialog.querySelector('tbody');
+  list.replaceChildren(...definitions.map(definition => {
+    const row = document.createElement('tr');
+    row.append(
+      element('td', '', `${definition.icon} ${definition.name}`),
+      element('td', '', definition.description),
+      element('td', 'profile-badge-condition-award-count', `${numberFormat.format(definition.awardCount || 0)}人`),
+    );
+    return row;
+  }));
 }
 
 function consolidatedBadgeSeries(badges, newBadgeKeys) {
@@ -206,65 +212,23 @@ function consolidatedBadgeSeries(badges, newBadgeKeys) {
   });
 }
 
-function prioritizedBadges(badges, visibleLimit = 6) {
-  const familyPriorities = {
-    total_count: 100,
-    create_count: 90,
-    modify_count: 80,
-    active_day_count: 70,
-    region_coverage: 60,
-    category_count: 50,
-    prefecture_active_day_count: 48,
-    balanced_count: 40,
-    prefecture: 30,
-  };
-  const familyPriority = badge => {
-    if (badge.metric === 'tag_group') return 45;
-    if (badge.metric === 'active_day_count' && Number(badge.threshold || 0) <= 30) return 25;
-    return familyPriorities[badgeFamily(badge)] || 0;
-  };
-  const compareWithinFamily = (left, right) =>
-    Number(right.threshold || 0) - Number(left.threshold || 0)
-      || String(right.earnedAt || '').localeCompare(String(left.earnedAt || ''))
-      || String(left.badgeKey || '').localeCompare(String(right.badgeKey || ''));
-  const compareFamilies = (left, right) =>
-    familyPriority(right) - familyPriority(left)
-      || compareWithinFamily(left, right);
-  const families = new Map();
-  badges.forEach((badge) => {
-    const family = badgeFamily(badge);
-    if (!families.has(family)) families.set(family, []);
-    families.get(family).push(badge);
-  });
-  const representatives = [];
-  const lowerBadges = [];
-  families.forEach((familyBadges) => {
-    familyBadges.sort(compareWithinFamily);
-    representatives.push(familyBadges[0]);
-    lowerBadges.push(...familyBadges.slice(1));
-  });
-  representatives.sort(compareFamilies);
-  lowerBadges.sort(compareFamilies);
-  const visible = representatives.slice(0, visibleLimit);
-  if (visible.length < visibleLimit) visible.push(...lowerBadges.slice(0, visibleLimit - visible.length));
-  const visibleKeys = new Set(visible.map(badge => badge.badgeKey));
-  const hidden = [...representatives.slice(visibleLimit), ...lowerBadges]
-    .filter(badge => !visibleKeys.has(badge.badgeKey));
-  return {visible, hidden};
+function compareBadgeDisplayOrder(left, right) {
+  return Number(right.badgeLevel || 0) - Number(left.badgeLevel || 0)
+    || Number(right.threshold || 0) - Number(left.threshold || 0)
+    || String(right.earnedAt || '').localeCompare(String(left.earnedAt || ''))
+    || String(left.badgeKey || '').localeCompare(String(right.badgeKey || ''));
 }
 
 function renderBadges(data, newBadgeKeys = new Set()) {
   renderBadgeGuide(data.badgeDefinitions || [], data.badges);
+  renderNextBadgeGuide(data.badgeDefinitions || []);
   document.querySelector('#profile-badge-count').textContent = `${data.badges.length}個獲得`;
   const badges = document.querySelector('#profile-badges');
-  const sortedBadges = consolidatedBadgeSeries(data.badges, newBadgeKeys);
-  const prioritized = prioritizedBadges(sortedBadges);
-  const newBadges = sortedBadges.filter(badge => badge.isNew);
-  const remainingBadges = [...prioritized.visible, ...prioritized.hidden]
-    .filter(badge => !badge.isNew);
-  const recentBadges = [...newBadges, ...remainingBadges].slice(0, 6);
+  const sortedBadges = consolidatedBadgeSeries(data.badges, newBadgeKeys)
+    .sort(compareBadgeDisplayOrder);
+  const recentBadges = sortedBadges.slice(0, 6);
   const visibleKeys = new Set(recentBadges.map(badge => badge.badgeKey));
-  const olderBadges = [...newBadges, ...remainingBadges].filter(badge => !visibleKeys.has(badge.badgeKey));
+  const olderBadges = sortedBadges.filter(badge => !visibleKeys.has(badge.badgeKey));
   badges.replaceChildren(...recentBadges.map(badge => badgeCard(badge, badge.isNew)));
   if (!sortedBadges.length) badges.append(element('p', 'profile-empty', '獲得済みバッジはまだありません。'));
 
@@ -286,7 +250,16 @@ function renderBadges(data, newBadgeKeys = new Set()) {
   const next = document.querySelector('#profile-next-badges');
   next.replaceChildren();
   if (!data.nextBadges.length) return;
-  next.append(element('h4', '', '次のバッジ'));
+  const nextHeading = element('div', 'profile-next-badge-heading');
+  const nextTitle = element('h4', '', '次のバッジ');
+  const nextGuideButton = element('button', 'app-modal-trigger', '❗');
+  nextGuideButton.id = 'profile-next-badge-guide-open';
+  nextGuideButton.type = 'button';
+  nextGuideButton.setAttribute('aria-haspopup', 'dialog');
+  nextGuideButton.setAttribute('aria-label', '現在のバッジ条件を表示');
+  nextGuideButton.title = '現在のバッジ条件を表示';
+  nextHeading.append(nextTitle, nextGuideButton);
+  next.append(nextHeading);
   data.nextBadges.forEach(badge => {
     const row = element('div', 'profile-next-badge');
     const title = element('div');
@@ -355,25 +328,33 @@ function replayNewBadgeEffect() {
 
 document.querySelector('#profile-replay-badges').addEventListener('click', replayNewBadgeEffect);
 
-function setupProfileGuideDialog(triggerSelector, dialogSelector, closeSelector) {
-  const trigger = document.querySelector(triggerSelector);
-  const dialog = document.querySelector(dialogSelector);
-  const closeButton = document.querySelector(closeSelector);
-  trigger.addEventListener('click', () => {
-    if (!dialog.open) {
-      document.body.classList.add('is-badge-guide-open');
-      dialog.showModal();
-    }
+function setupProfileGuideDialog(triggerSelector, dialogTarget) {
+  const dialog = typeof dialogTarget === 'string' ? document.querySelector(dialogTarget) : dialogTarget;
+  const modal = new window.OSMModal(dialog, {
+    beforeOpen: () => document.body.classList.add('is-badge-guide-open'),
+    afterClose: () => document.body.classList.remove('is-badge-guide-open'),
   });
-  closeButton.addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', event => {
-    if (event.target === dialog) dialog.close();
+  document.addEventListener('click', event => {
+    const trigger = event.target.closest(triggerSelector);
+    if (trigger) modal.open({returnFocus: trigger, focusTarget: modal.closeButton});
   });
-  dialog.addEventListener('close', () => document.body.classList.remove('is-badge-guide-open'));
 }
 
-setupProfileGuideDialog('#profile-level-guide-open', '#profile-level-guide', '#profile-level-guide-close');
-setupProfileGuideDialog('#profile-badge-guide-open', '#profile-badge-guide', '#profile-badge-guide-close');
+const monthlyLevelGuide = [['1', '1', 'これからマッパー'], ['2', '10', 'それなりマッパー'], ['3', '50', 'そこそこマッパー'], ['4', '100', 'たくさんマッパー'], ['5', '250', 'ものすごマッパー'], ['6', '500', 'とんでもマッパー'], ['7', '1,000', 'さいこうマッパー']];
+const cumulativeLevelGuide = [['1', '1', 'Registered Editor'], ['2', '10', 'Novice Editor'], ['3', '25', 'Apprentice Editor'], ['4', '50', 'Journeyman Editor'], ['5', '100', 'Yeoman Editor'], ['6', '250', 'Experienced Editor'], ['7', '500', 'Veteran Editor'], ['8', '1,000', 'Veteran Editor II'], ['9', '1,500', 'Veteran Editor III'], ['10', '2,000', 'Veteran Editor IV'], ['11', '3,000', 'Senior Editor'], ['12', '4,000', 'Senior Editor II'], ['13', '5,000', 'Senior Editor III'], ['14', '7,500', 'Master Editor'], ['15', '10,000', 'Master Editor II'], ['16', '15,000', 'Master Editor III'], ['17', '20,000', 'Master Editor IV'], ['18', '30,000', 'Grandmaster Editor']];
+const levelGuideItems = rows => rows.map(([level, count, name]) => `<li><b>Lv.${level}</b><span>${count}件</span><strong>${name}</strong></li>`).join('');
+
+const levelGuideDialog = window.OSMModal.createDialog({
+  labelledBy: 'profile-level-guide-title',
+  content: `<div class="app-modal-heading"><div><h2 id="profile-level-guide-title">レベルアップ条件</h2><p>編集した対象地物の件数に応じてレベルが上がります。</p></div></div><div class="profile-badge-guide-list profile-level-guide-list"><section class="profile-level-guide-group"><h3>月間レベル</h3><p>今月の編集件数で判定します。</p><ol>${levelGuideItems(monthlyLevelGuide)}</ol></section><section class="profile-level-guide-group"><h3>累積レベル</h3><p>集計期間内の編集件数で判定します。</p><ol>${levelGuideItems(cumulativeLevelGuide)}</ol></section></div>`,
+});
+const nextBadgeGuideDialog = window.OSMModal.createDialog({
+  labelledBy: 'profile-next-badge-guide-title',
+  content: '<div class="app-modal-heading"><div><h2 id="profile-next-badge-guide-title">現在のバッジ条件</h2><p>バッジ名、獲得条件、獲得者数の一覧です。</p></div></div><div class="profile-badge-condition-table-wrap"><table class="profile-badge-condition-table"><thead><tr><th>バッジ</th><th>条件</th><th>獲得者</th></tr></thead><tbody></tbody></table></div>',
+});
+setupProfileGuideDialog('#profile-level-guide-open', levelGuideDialog);
+setupProfileGuideDialog('#profile-badge-guide-open', '#profile-badge-guide');
+setupProfileGuideDialog('#profile-next-badge-guide-open', nextBadgeGuideDialog);
 
 function renderBars(selector, rows, label) {
   const target = document.querySelector(selector);

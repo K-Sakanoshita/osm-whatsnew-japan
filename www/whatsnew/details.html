@@ -2,6 +2,15 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-V4357J57C7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-V4357J57C7');
+  </script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>データ分析｜OSM What’s New Japan</title>
   <meta name="description" content="日本全国または都道府県を選び、OpenStreetMapで更新された地物を、代表タグ・編集者・日付・変更セット別に集計できます。">
@@ -24,7 +33,7 @@
   <meta name="twitter:description" content="日本全国または都道府県を選び、OpenStreetMapで更新された地物を、代表タグ・編集者・日付・変更セット別に集計できます。">
   <meta name="twitter:image" content="https://armd-01.sakura.ne.jp/whatsnew/image/whatsnew.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20260812-2">
+  <link rel="stylesheet" href="style.css?v=20260814-1">
   <link rel="stylesheet" href="details.css?v=20260811-21">
 </head>
 <body class="details-page">
@@ -65,7 +74,8 @@
   </main>
   <script src="https://unpkg.com/maplibre-gl@5.12.0/dist/maplibre-gl.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-  <script src="help.js?v=20260812-3"></script>
+  <script src="modal.js?v=20260814-7"></script>
+  <script src="help.js?v=20260814-5"></script>
   <script src="map-view.js?v=20260811-1"></script>
   <script src="details.js?v=20260811-13"></script>
 </body>

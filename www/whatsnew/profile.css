@@ -246,10 +246,38 @@
 }
 
 
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+
 .profile-identity h2 {
   margin: 0;
   font-size: clamp(27px, 4vw, 42px);
   line-height: 1.15
+}
+
+
+.profile-osm-link {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none
+}
+
+
+.profile-osm-link:hover {
+  color: #d6eee6
+}
+
+
+.profile-osm-link:focus-visible {
+  border-radius: 3px;
+  outline: 3px solid rgba(255, 255, 255, .45);
+  outline-offset: 3px
 }
 
 
@@ -266,7 +294,6 @@
 }
 
 
-.profile-links a,
 .profile-links button {
   min-height: 36px;
   padding: 7px 11px;
@@ -324,95 +351,6 @@
   display: flex;
   align-items: center;
   gap: 7px
-}
-
-
-.profile-badge-guide-open {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid #c8dad2;
-  border-radius: 50%;
-  background: #f1f8f5;
-  font-size: 15px;
-  cursor: pointer
-}
-
-
-.profile-badge-guide {
-  width: min(720px, calc(100% - 28px));
-  height: min(78vh, 760px);
-  max-height: min(78vh, 760px);
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: 16px;
-  color: #263b33;
-  box-shadow: 0 18px 55px rgba(12, 45, 35, .28)
-}
-
-
-.profile-badge-guide[open] {
-  display: flex;
-  flex-direction: column
-}
-
-
-.profile-badge-guide::backdrop {
-  background: rgba(17, 42, 34, .56)
-}
-
-
-.profile-badge-guide-heading {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 20px 22px 16px;
-  border-bottom: 1px solid #dce8e2;
-  background: #fff
-}
-
-
-.profile-badge-guide-heading>div {
-  min-width: 0
-}
-
-
-.profile-badge-guide-heading h2,
-.profile-badge-guide-heading p {
-  margin: 0
-}
-
-
-.profile-badge-guide-heading h2 {
-  color: #155e4a;
-  font-size: 21px
-}
-
-
-.profile-badge-guide-heading p {
-  margin-top: 6px;
-  color: #667a72;
-  font-size: 12px;
-  line-height: 1.6
-}
-
-
-.profile-badge-guide-heading button {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: #eef5f2;
-  color: #315248;
-  font-size: 24px;
-  cursor: pointer
 }
 
 
@@ -716,9 +654,49 @@
 }
 
 
-.profile-next-badges h4 {
+#profile-content .profile-next-badges h4 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 27px
+}
+
+.profile-next-badge-heading {
   grid-column: 1 / -1;
-  margin-bottom: -1px
+  display: flex;
+  align-items: center;
+  gap: 7px
+}
+
+.profile-badge-condition-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 22px 24px
+}
+
+.profile-badge-condition-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px
+}
+
+.profile-badge-condition-table th,
+.profile-badge-condition-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid #dce7e2;
+  text-align: left
+}
+
+.profile-badge-condition-table th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  color: #315248
+}
+
+.profile-badge-condition-award-count {
+  white-space: nowrap;
+  text-align: right !important
 }
 
 
@@ -960,12 +938,13 @@
     line-height: 1.35
   }
 
-  .profile-links a,
   .profile-links button {
     min-height: 26px;
     padding: 3px 8px;
     font-size: 10px
   }
+
+  .profile-osm-link { font-size: 18px }
 
   .profile-scope {
     margin: 8px 2px 11px;
