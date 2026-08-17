@@ -649,6 +649,9 @@ try {
         'SELECT DATE(osm_timestamp) AS ranking_date,'
         . " SUM(CASE WHEN change_action = 'create' THEN 1 ELSE 0 END) AS creates,"
         . " SUM(CASE WHEN change_action = 'create' THEN 0 ELSE 1 END) AS `modifies`, "
+        . " COUNT(DISTINCT CASE WHEN editor_uid IS NOT NULL"
+        . " THEN CONCAT('uid:', editor_uid)"
+        . " ELSE CONCAT('name:', COALESCE(NULLIF(editor_name,''),'不明')) END) AS mapperCount,"
         . ' COUNT(*) AS count'
         . " FROM osm_poi WHERE {$where}"
         . ' GROUP BY DATE(osm_timestamp)'
@@ -677,7 +680,7 @@ try {
             'mappers' => $castCounts($mappers, ['creates', 'modifies', 'count']),
             'changesets' => $castCounts($changesets, ['creates', 'modifies', 'count']),
             'categories' => $castCounts($categories, ['creates', 'modifies', 'count']),
-            'daily' => $castCounts($daily, ['creates', 'modifies', 'count']),
+            'daily' => $castCounts($daily, ['creates', 'modifies', 'mapperCount', 'count']),
             'prefectures' => $castCounts($prefectures, ['creates', 'modifies', 'count']),
         ],
         JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR

@@ -18,12 +18,15 @@ const chartRenderers = {};
 const chartCompanionRenderers = {};
 const CREATE_COLOR = '#177866';
 const MODIFY_COLOR = '#c45f32';
+const EASY_CHANGESET_VIEWER_URL = 'https://k-sakanoshita.github.io/Easy_Changeset_Viewer/';
 const prefectureCountsCache = new Map();
 const PREFECTURE_FILL_LAYER = 'prefecture-select-fill';
 const PREFECTURE_OUTLINE_LAYER = 'prefecture-select-outline';
 const PREFECTURE_SELECTED_LAYER = 'prefecture-selected-fill';
 const PREFECTURE_NAME_EXPRESSION = ['coalesce', ['get', 'name:ja'], ['get', 'name']];
 const prefectureName = feature => String(feature?.properties?.['name:ja'] || feature?.properties?.name || '');
+const easyChangesetViewerUrl = changesetId =>
+  `${EASY_CHANGESET_VIEWER_URL}?changeset=${encodeURIComponent(changesetId)}`;
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const number = value => Number(value).toLocaleString('ja-JP');
@@ -378,8 +381,8 @@ function initializeChartActionFilters() {
   });
 }
 
-function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect) {
-  chartRenderers[id] = () => renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect);
+function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect, onLabelSelect) {
+  chartRenderers[id] = () => renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect, onLabelSelect);
   charts[id]?.destroy();
   const action = selectedChartAction(id);
   const filteredEntries = filterChartEntries(entries, action);
@@ -410,7 +413,10 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect
       plugins: {legend: {display: hasActionBreakdown}},
       scales: {
         x: {stacked: hasActionBreakdown && action === 'both', beginAtZero: true, ticks: {precision: 0}},
-        y: {stacked: hasActionBreakdown && action === 'both'},
+        y: {
+          stacked: hasActionBreakdown && action === 'both',
+          ticks: onLabelSelect ? {color: '#155e4a', font: {weight: '600'}} : undefined,
+        },
       },
       onClick: onSelect ? (_event, elements) => {
         const index = elements[0]?.index;
@@ -418,6 +424,37 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect
       } : undefined,
     },
   });
+  const canvas = charts[id].canvas;
+  if (canvas.horizontalLabelClickHandler) {
+    canvas.removeEventListener('click', canvas.horizontalLabelClickHandler);
+    canvas.removeEventListener('mousemove', canvas.horizontalLabelMoveHandler);
+  }
+  canvas.style.cursor = '';
+  if (!onLabelSelect) return;
+  const labelEntryAtEvent = event => {
+    const chart = charts[id];
+    const yScale = chart?.scales?.y;
+    if (!yScale) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * chart.width / rect.width;
+    const y = (event.clientY - rect.top) * chart.height / rect.height;
+    if (x < yScale.left || x > yScale.right || y < yScale.top || y > yScale.bottom) return null;
+    const index = Math.round(yScale.getValueForPixel(y));
+    return top[index] || null;
+  };
+  canvas.horizontalLabelClickHandler = event => {
+    const entry = labelEntryAtEvent(event);
+    if (entry) onLabelSelect(entry);
+  };
+  canvas.horizontalLabelMoveHandler = event => {
+    canvas.style.cursor = labelEntryAtEvent(event) ? 'pointer' : '';
+  };
+  canvas.addEventListener('click', canvas.horizontalLabelClickHandler);
+  canvas.addEventListener('mousemove', canvas.horizontalLabelMoveHandler);
+}
+
+function openEasyChangesetViewer(entry) {
+  window.open(easyChangesetViewerUrl(entry.key), '_blank', 'noopener,noreferrer');
 }
 
 function renderMapperChart(entries, id = 'mapper-chart') {
@@ -566,7 +603,7 @@ function updateChangesetCompanions(entries) {
   const filtered = filterChartEntries(entries, selectedChartAction('changeset-chart')).slice(0, 100);
   document.querySelector('#changeset-table').innerHTML = filtered.map((entry, index) => {
     const editor = entry.row.editorName || '不明';
-    return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
+    return `<tr><td>${index + 1}</td><td><a href="${easyChangesetViewerUrl(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
   }).join('');
   setCsvList('changesets', [
     ['順位', '変更セット', 'マッパー', '件数'],
@@ -694,6 +731,55 @@ function renderDailyChart(dailyRows) {
   });
 }
 
+function buildDailyMapperRows(rows) {
+  const daily = new Map();
+  const start = new Date(fromElement.value + 'T00:00:00Z');
+  const end = new Date(toElement.value + 'T00:00:00Z');
+  if (Number.isFinite(start.getTime()) && Number.isFinite(end.getTime()) && start <= end) {
+    for (let time = start.getTime(); time <= end.getTime(); time += 24 * 60 * 60 * 1000) {
+      const date = new Date(time).toISOString().slice(0, 10);
+      daily.set(date, new Set());
+    }
+  }
+  rows.forEach(row => {
+    const date = String(row.date).slice(0, 10);
+    const key = row.editorUid ? `uid:${row.editorUid}` : `name:${row.editorName || '不明'}`;
+    if (!daily.has(date)) daily.set(date, new Set());
+    daily.get(date).add(key);
+  });
+  return [...daily.entries()]
+    .map(([date, mappers]) => ({date, mapperCount: mappers.size}))
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function renderDailyMapperChart(rows) {
+  charts['daily-mapper-chart']?.destroy();
+  charts['daily-mapper-chart'] = new Chart(document.querySelector('#daily-mapper-chart'), {
+    type: 'line',
+    data: {
+      labels: rows.map(row => row.date.replace(/-/g, '/')),
+      datasets: [{
+        label: 'マッパー人数',
+        data: rows.map(row => row.mapperCount),
+        borderColor: '#285b47',
+        backgroundColor: 'rgba(40, 91, 71, .14)',
+        borderWidth: 2,
+        pointRadius: rows.length > 60 ? 0 : 2,
+        pointHoverRadius: 4,
+        fill: true,
+        tension: .18,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {legend: {display: false}},
+      scales: {y: {beginAtZero: true, ticks: {precision: 0}}},
+    },
+  });
+}
+
 function render(rows) {
   document.querySelector('#prefecture-ranking').hidden = true;
   document.querySelector('#changeset-ranking').hidden = false;
@@ -722,6 +808,7 @@ function render(rows) {
 
   const dailyRows = buildDailyRows(rows);
   renderDailyChart(dailyRows);
+  renderDailyMapperChart(buildDailyMapperRows(rows));
   document.querySelector('#daily-table').innerHTML = dailyRows.map(row =>
     `<tr><td>${escapeHtml(row.date.replace(/-/g, '/'))}</td><td>${number(row.create)}</td><td>${number(row.modify)}</td><td>${number(row.create + row.modify)}</td></tr>`).join('');
   setCsvList('daily', [
@@ -730,11 +817,11 @@ function render(rows) {
   ]);
 
 
-  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数');
+  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数', null, openEasyChangesetViewer);
   const displayedChangesets = changesets.slice(0, 100);
   document.querySelector('#changeset-table').innerHTML = displayedChangesets.map((entry, index) => {
     const editor = entry.row.editorName || '不明';
-    return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
+    return `<tr><td>${index + 1}</td><td><a href="${easyChangesetViewerUrl(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
   }).join('');
   setCsvList('changesets', [
     ['順位', '変更セット', 'マッパー', '件数'],
@@ -761,12 +848,17 @@ function buildAggregateDailyRows(rows) {
   if (Number.isFinite(start.getTime()) && Number.isFinite(end.getTime()) && start <= end) {
     for (let time = start.getTime(); time <= end.getTime(); time += 24 * 60 * 60 * 1000) {
       const date = new Date(time).toISOString().slice(0, 10);
-      daily.set(date, {date, create: 0, modify: 0});
+      daily.set(date, {date, create: 0, modify: 0, mapperCount: 0});
     }
   }
   rows.forEach(row => {
     const date = String(row.ranking_date || row.date).slice(0, 10);
-    daily.set(date, {date, create: Number(row.creates) || 0, modify: Number(row.modifies) || 0});
+    daily.set(date, {
+      date,
+      create: Number(row.creates) || 0,
+      modify: Number(row.modifies) || 0,
+      mapperCount: Number(row.mapperCount) || 0,
+    });
   });
   return [...daily.values()].sort((left, right) => left.date.localeCompare(right.date));
 }
@@ -829,10 +921,10 @@ function renderNationwide(data) {
   document.querySelector('#mapper-table').innerHTML = mapperTableRows(mappers, total);
   setCsvList('mappers', mapperCsvRows(mappers, total));
 
-  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数');
+  renderHorizontalChart('changeset-chart', changesets, entry => `#${entry.key}`, '更新地物数', null, openEasyChangesetViewer);
   document.querySelector('#changeset-table').innerHTML = changesets.map((entry, index) => {
     const editor = entry.row.editorName || '不明';
-    return `<tr><td>${index + 1}</td><td><a href="https://www.openstreetmap.org/changeset/${encodeURIComponent(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
+    return `<tr><td>${index + 1}</td><td><a href="${easyChangesetViewerUrl(entry.key)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.key)}</a></td><td>${escapeHtml(editor)}</td><td>${number(entry.count)}</td></tr>`;
   }).join('');
   setCsvList('changesets', [
     ['順位', '変更セット', 'マッパー', '件数'],
@@ -842,6 +934,7 @@ function renderNationwide(data) {
   ]);
 
   renderDailyChart(dailyRows);
+  renderDailyMapperChart(dailyRows);
   document.querySelector('#daily-table').innerHTML = dailyRows.map(row =>
     `<tr><td>${escapeHtml(row.date.replace(/-/g, '/'))}</td><td>${number(row.create)}</td><td>${number(row.modify)}</td><td>${number(row.create + row.modify)}</td></tr>`).join('');
   setCsvList('daily', [
