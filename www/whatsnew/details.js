@@ -415,7 +415,7 @@ function renderHorizontalChart(id, entries, labelBuilder, datasetLabel, onSelect
         x: {stacked: hasActionBreakdown && action === 'both', beginAtZero: true, ticks: {precision: 0}},
         y: {
           stacked: hasActionBreakdown && action === 'both',
-          ticks: onLabelSelect ? {color: '#155e4a', font: {weight: '600'}} : undefined,
+          ...(onLabelSelect ? {ticks: {color: '#155e4a', font: {weight: '600'}}} : {}),
         },
       },
       onClick: onSelect ? (_event, elements) => {
