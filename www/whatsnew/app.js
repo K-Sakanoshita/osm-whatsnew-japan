@@ -47,7 +47,6 @@ const requestedStepValue = STEP_PARAMETER_TO_VALUE[mapPageUrl.searchParams.get('
 const rawPrefectureCode = (mapPageUrl.searchParams.get('pref') || '').toUpperCase();
 const requestedPrefectureCode = /^JP-\d{2}$/.test(rawPrefectureCode) ? rawPrefectureCode : '';
 const requestedTimeValue = Date.parse(mapPageUrl.searchParams.get('time') || '');
-const requestedAutomaticPlayback = mapPageUrl.searchParams.get('play') === '1';
 let pendingSharedTime = Number.isFinite(requestedTimeValue) ? requestedTimeValue : null;
 if (mapPageUrl.search) {
   const cleanUrl = new URL(mapPageUrl);
@@ -125,12 +124,29 @@ function updateSummaryPlayButton(playing, demo = false) {
   });
 }
 
+function clearTimelinePlayAttention() {
+  timelinePlayAttentionPending = false;
+  timelinePlayButtons.forEach(button => button.classList.remove('is-load-ready'));
+}
+
+function highlightTimelinePlayButtons() {
+  timelinePlayAttentionPending = true;
+  if (guideDialog?.open || timeline.hidden || !markerEntries.length) return;
+  timelinePlayAttentionPending = false;
+  timelinePlayButtons.forEach((button) => {
+    button.classList.remove('is-load-ready');
+    void button.offsetWidth;
+    button.classList.add('is-load-ready');
+  });
+}
+
 const shareStatus = document.querySelector('#share-status');
 if (requestedStepValue) timelineStep.value = requestedStepValue;
 
 const LIST_WIDTH_STORAGE_KEY = 'osm-whatsnew-list-width-v1';
 const LIST_HEIGHT_STORAGE_KEY = 'osm-whatsnew-list-height-v1';
 let listResizeFrame = null;
+let activeListResizePointerId = null;
 
 function listWidthLimits() {
   const styles = getComputedStyle(mapPageMain);
@@ -203,14 +219,15 @@ try {
 updateListResizeOrientation();
 
 listResizeHandle.addEventListener('pointerdown', event => {
-  if (getComputedStyle(listResizeHandle).display === 'none') return;
+  if (getComputedStyle(listResizeHandle).display === 'none' || activeListResizePointerId !== null) return;
   event.preventDefault();
   listResizeHandle.setPointerCapture(event.pointerId);
+  activeListResizePointerId = event.pointerId;
   document.body.classList.add('is-resizing-list');
   document.body.style.cursor = getComputedStyle(listResizeHandle).cursor;
 });
-listResizeHandle.addEventListener('pointermove', event => {
-  if (!listResizeHandle.hasPointerCapture(event.pointerId)) return;
+window.addEventListener('pointermove', event => {
+  if (event.pointerId !== activeListResizePointerId) return;
   const mainRect = mapPageMain.getBoundingClientRect();
   if (listResizeIsVertical()) {
     const rightPadding = parseFloat(getComputedStyle(mapPageMain).paddingRight);
@@ -220,15 +237,16 @@ listResizeHandle.addEventListener('pointermove', event => {
   }
 });
 const finishListResize = event => {
-  if (!listResizeHandle.hasPointerCapture(event.pointerId)) return;
-  listResizeHandle.releasePointerCapture(event.pointerId);
+  if (event.pointerId !== activeListResizePointerId) return;
+  activeListResizePointerId = null;
   document.body.classList.remove('is-resizing-list');
   document.body.style.cursor = '';
   if (listResizeIsVertical()) setListWidth(parseFloat(getComputedStyle(listPanel).width), true);
   else setListHeight(parseFloat(getComputedStyle(listPanel).height), true);
 };
-listResizeHandle.addEventListener('pointerup', finishListResize);
-listResizeHandle.addEventListener('pointercancel', finishListResize);
+window.addEventListener('pointerup', finishListResize);
+window.addEventListener('pointercancel', finishListResize);
+listResizeHandle.addEventListener('lostpointercapture', finishListResize);
 listResizeHandle.addEventListener('keydown', event => {
   const vertical = listResizeIsVertical();
   const accepted = vertical
@@ -254,7 +272,6 @@ let markerEntries = [];
 let poiFeatures = [];
 let highlightRadius = 10 * 60 * 1000;
 let playbackTimer = null;
-let playbackStartTimer = null;
 let playbackFrame = null;
 let isPlaying = false;
 let activeListItem = null;
@@ -315,7 +332,7 @@ let fallbackMapIconPromise = null;
 const sourceMapIconPromises = new Map();
 let shareFeedbackTimer = null;
 let resumePlaybackAfterGuide = false;
-let automaticPlaybackPending = false;
+let timelinePlayAttentionPending = false;
 let apiUrl = '';
 let configurationPromise = null;
 let demoAnimationFrame = null;
@@ -690,7 +707,7 @@ async function startDemoMode() {
   if (!poiFeatures.length || demoCanvas || mapStyleTransitioning) return;
   mapStyleTransitioning = true;
   demoModeButton.disabled = true;
-  automaticPlaybackPending = false;
+  clearTimelinePlayAttention();
   pauseTimeline();
   osmPopup.remove();
   demoView = {center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch()};
@@ -1001,7 +1018,7 @@ function buildCurrentViewUrl({includeTime = false} = {}) {
   if (stepParameter) url.searchParams.set('step', stepParameter);
   else url.searchParams.delete('step');
 
-  url.searchParams.set('play', '1');
+  url.searchParams.delete('play');
 
   if (!includeTime) {
     url.searchParams.delete('time');
@@ -1377,6 +1394,7 @@ function decorateItem(item) {
 
 function clearMarkers({preserveDemo = false} = {}) {
   if (!preserveDemo) stopDemoMode({restoreView: false});
+  clearTimelinePlayAttention();
   pauseTimeline();
   if (preserveDemo) updateSummaryPlayButton(!demoPaused, true);
   osmPopup.remove();
@@ -1409,10 +1427,6 @@ function clearMarkers({preserveDemo = false} = {}) {
 
 function pauseTimeline() {
   isPlaying = false;
-  if (playbackStartTimer !== null) {
-    clearTimeout(playbackStartTimer);
-    playbackStartTimer = null;
-  }
   if (playbackTimer !== null) {
     clearTimeout(playbackTimer);
     playbackTimer = null;
@@ -1480,6 +1494,7 @@ function playNextStep() {
 
 function playTimeline() {
   if (guideDialog?.open) return;
+  clearTimelinePlayAttention();
   pauseTimeline();
   if (Number(range.value) >= Number(range.max)) range.value = range.min;
   isPlaying = true;
@@ -1489,29 +1504,9 @@ function playTimeline() {
 }
 
 
-function startPendingAutomaticPlayback() {
-  if (!automaticPlaybackPending || guideDialog?.open || timeline.hidden || !markerEntries.length) return;
-  automaticPlaybackPending = false;
-  if (playbackStartTimer !== null) return;
-  playbackStartTimer = setTimeout(() => {
-    playbackStartTimer = null;
-    if (guideDialog?.open) {
-      automaticPlaybackPending = true;
-      return;
-    }
-    playTimeline();
-  }, 500);
-}
-
-function requestAutomaticPlayback() {
-  automaticPlaybackPending = true;
-  startPendingAutomaticPlayback();
-}
-
 function handleGuideBeforeOpen(event) {
   const mode = event.detail?.mode || 'manual';
   resumePlaybackAfterGuide = mode === 'manual' && isPlaying;
-  if (mode === 'manual') automaticPlaybackPending = false;
   pauseTimeline();
 }
 
@@ -1520,12 +1515,8 @@ function handleGuideClosed(event) {
   const shouldResume = mode === 'manual' && resumePlaybackAfterGuide;
   resumePlaybackAfterGuide = false;
 
-  if (mode === 'automatic') {
-    startPendingAutomaticPlayback();
-  } else if (mode === 'manual') {
-    automaticPlaybackPending = false;
-    if (shouldResume && !timeline.hidden && markerEntries.length) playTimeline();
-  }
+  if (shouldResume && !timeline.hidden && markerEntries.length) playTimeline();
+  else if (timelinePlayAttentionPending) highlightTimelinePlayButtons();
 }
 function lowerBound(value) {
   let low = 0;
@@ -2106,7 +2097,6 @@ async function show(items) {
     ? items
     : items.filter(item => item.action === selectedPoiAction);
   const ordered = [...actionFilteredItems].sort((a, b) => parseUtcDate(a.date) - parseUtcDate(b.date));
-  automaticPlaybackPending = false;
   if (!ordered.length) {
     setupTimeline([]);
     return;
@@ -2180,7 +2170,7 @@ async function show(items) {
   timeline.hidden = false;
   updateMapLegend();
   void hydrateMapIcons(markerEntries, currentRender).catch(error => console.error('地図アイコンを読み込めませんでした:', error));
-  if (!demoCanvas && (!selectedPrefecture || requestedAutomaticPlayback)) requestAutomaticPlayback();
+  if (!demoCanvas) highlightTimelinePlayButtons();
 }
 async function load() {
   const currentLoad = ++loadVersion;
@@ -2265,6 +2255,7 @@ timelineResetButton.addEventListener('click', () => {
 });
 timelinePlayButtons.forEach((button) => {
   button.addEventListener('click', () => {
+    clearTimelinePlayAttention();
     if (demoCanvas) {
       if (demoPaused) playDemoPlayback();
       else pauseDemoPlayback();

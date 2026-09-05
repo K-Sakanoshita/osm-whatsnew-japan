@@ -1042,6 +1042,35 @@
 }
 
 
+.index-page .timeline-play-button.is-load-ready:not(.is-playing) {
+  border-color: #d99500;
+  background: #fff4bd;
+  color: #7a4b00;
+  box-shadow: 0 0 0 3px rgba(230, 167, 0, .24);
+  animation: timeline-play-ready-pulse .75s ease-out 3
+}
+
+
+@keyframes timeline-play-ready-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 3px rgba(230, 167, 0, .24)
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 7px rgba(230, 167, 0, .12)
+  }
+}
+
+
+@media(prefers-reduced-motion:reduce) {
+  .index-page .timeline-play-button.is-load-ready:not(.is-playing) {
+    animation: none
+  }
+}
+
+
 .index-page #timeline-reset:hover:not(:disabled) {
   border-color: #0b654f;
   background: #e4f3ee
