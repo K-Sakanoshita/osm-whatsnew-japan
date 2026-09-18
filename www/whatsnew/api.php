@@ -20,7 +20,7 @@ try {
     );
 
     $mode = strtolower(trim((string) ($_GET['mode'] ?? 'pois')));
-    $allowedModes = ['pois', 'japan', 'prefectures', 'facets', 'profile', 'mapper_search', 'profile_region_mappers'];
+    $allowedModes = ['pois', 'japan', 'prefectures', 'facets', 'profile', 'mapper_search', 'profile_region_mappers', 'badge_mappers'];
     if (!in_array($mode, $allowedModes, true)) {
         throw new InvalidArgumentException('Unsupported mode.');
     }
@@ -95,6 +95,29 @@ try {
     };
 
     $prefecture = $readTextFilter('prefecture', 64);
+    if (array_key_exists('prefecture_code', $_GET)) {
+        $prefectureCode = $_GET['prefecture_code'];
+        if (!is_string($prefectureCode)
+            || !preg_match('/^(0[1-9]|[1-3][0-9]|4[0-7])$/D', $prefectureCode)) {
+            throw new InvalidArgumentException('prefecture_code must be a two-digit code from 01 to 47.');
+        }
+        // Standard prefecture code order. Keep the existing name-based DB filter.
+        $prefectureNames = [
+            '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+            '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+            '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+            '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+            '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+            '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+            '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+        ];
+        $resolvedPrefecture = $prefectureNames[(int) $prefectureCode - 1];
+        if ($prefecture !== '' && $prefecture !== $resolvedPrefecture) {
+            throw new InvalidArgumentException('prefecture and prefecture_code must identify the same prefecture.');
+        }
+        $prefecture = $resolvedPrefecture;
+        $filters['prefecture_code'] = $prefectureCode;
+    }
     if ($prefecture !== '') {
         $conditions[] = 'prefecture = :prefecture';
         $parameters['prefecture'] = $prefecture;
@@ -143,6 +166,38 @@ try {
         $conditions[] = 'change_action = :action';
         $parameters['action'] = $action;
         $filters['action'] = $action;
+    }
+
+    if (array_key_exists('tag_key', $_GET) || array_key_exists('tag_value', $_GET)) {
+        if ($mode !== 'pois') {
+            throw new InvalidArgumentException('tag_key and tag_value are supported only in pois mode.');
+        }
+        $tagKey = $_GET['tag_key'] ?? null;
+        if (!is_string($tagKey) || $tagKey === ''
+            || !mb_check_encoding($tagKey, 'UTF-8') || mb_strlen($tagKey) > 255) {
+            throw new InvalidArgumentException('tag_key must be a non-empty UTF-8 string of at most 255 characters.');
+        }
+        // Quote the entire key as one JSONPath member; dots and wildcards are literal.
+        $tagPath = '$.' . json_encode($tagKey, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $conditions[] = "osm_type = 'node'";
+        $filters['tag_key'] = $tagKey;
+        if (array_key_exists('tag_value', $_GET)) {
+            $tagValue = $_GET['tag_value'];
+            if (!is_string($tagValue) || !mb_check_encoding($tagValue, 'UTF-8')
+                || mb_strlen($tagValue) > 255) {
+                throw new InvalidArgumentException('tag_value must be a UTF-8 string of at most 255 characters.');
+            }
+            // A missing key yields SQL NULL and cannot match even an empty string.
+            // Binary comparison preserves case and trailing spaces.
+            $conditions[] = 'CAST(JSON_UNQUOTE(JSON_EXTRACT(tags, :tag_value_path)) AS BINARY)'
+                . ' = CAST(:tag_value AS BINARY)';
+            $parameters['tag_value_path'] = $tagPath;
+            $parameters['tag_value'] = $tagValue;
+            $filters['tag_value'] = $tagValue;
+        } else {
+            $conditions[] = "JSON_CONTAINS_PATH(tags, 'one', :tag_path) = 1";
+            $parameters['tag_path'] = $tagPath;
+        }
     }
 
     $where = implode(' AND ', $conditions);
@@ -234,6 +289,36 @@ try {
             [
                 'meta' => ['mode' => 'profile_region_mappers', 'prefecture' => $prefecture],
                 'mappers' => $castCounts($mappers, ['total', 'creates', 'modifies']),
+            ],
+            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+        );
+        exit;
+    }
+
+    if ($mode === 'badge_mappers') {
+        $stage = 'badge mappers';
+        $badgeKey = $readTextFilter('badge_key', 64);
+        if ($badgeKey === '') {
+            throw new InvalidArgumentException('badge_mappers mode requires badge_key.');
+        }
+        $mappers = $fetchAll(
+            $pdo,
+            'SELECT badges.editor_uid AS uid,
+                    COALESCE(stats.editor_name, \'\') AS name,
+                    avatars.avatar_url AS avatarUrl,
+                    badges.earned_at AS earnedAt
+               FROM mapper_badges badges
+               LEFT JOIN mapper_profile_stats stats ON stats.editor_uid = badges.editor_uid
+               LEFT JOIN mapper_profile_avatars avatars ON avatars.editor_uid = badges.editor_uid
+              WHERE badges.badge_key = :badge_key AND badges.revoked_at IS NULL
+              ORDER BY badges.earned_at DESC, stats.editor_name, badges.editor_uid',
+            ['badge_key' => $badgeKey]
+        );
+        echo json_encode(
+            [
+                'meta' => ['mode' => 'badge_mappers', 'badgeKey' => $badgeKey],
+                'total' => count($mappers),
+                'mappers' => $mappers,
             ],
             JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );

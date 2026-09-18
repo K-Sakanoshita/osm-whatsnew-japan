@@ -535,9 +535,27 @@
 
 .profile-badge {
   position: relative;
+  width: 100%;
   gap: 11px;
   padding: 13px;
   border-radius: 11px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none
+}
+
+
+.profile-badge:hover {
+  border-color: #a9d4c3;
+  background: #f0faf5
+}
+
+
+.profile-badge:focus-visible {
+  outline: 3px solid rgba(8, 127, 91, .28);
+  outline-offset: 2px
 }
 
 
@@ -697,6 +715,31 @@
 .profile-badge-condition-award-count {
   white-space: nowrap;
   text-align: right !important
+}
+
+
+.profile-badge-mappers-body {
+  flex: 1 1 auto;
+  overscroll-behavior: contain
+}
+
+
+.profile-badge-mapper-list {
+  display: grid;
+  gap: 8px
+}
+
+
+.profile-badge-mapper-list a {
+  grid-template-columns: 36px minmax(0, 1fr)
+}
+
+
+.profile-badge-mapper-list a>strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
 }
 
 

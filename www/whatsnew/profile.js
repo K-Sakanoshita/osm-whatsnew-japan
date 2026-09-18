@@ -103,8 +103,12 @@ function renderStreaks(profile) {
 }
 
 function badgeCard(badge, isNew = false) {
-  const card = element('article', `profile-badge item-card${isNew ? ' is-new' : ''}`);
+  const card = element('button', `profile-badge item-card${isNew ? ' is-new' : ''}`);
+  card.type = 'button';
   card.dataset.badgeKey = badge.badgeKey;
+  card.setAttribute('aria-haspopup', 'dialog');
+  card.setAttribute('aria-label', `${badge.detailName || badge.name}の所持者を表示`);
+  card.addEventListener('click', () => openBadgeMappers(badge, card));
   card.append(element('span', 'profile-badge-icon', badge.icon));
   const copy = element('div');
   const name = element('strong', '', badge.name);
@@ -207,6 +211,7 @@ function consolidatedBadgeSeries(badges, newBadgeKeys) {
     return {
       ...highest,
       name: `${baseName}${levels}`,
+      detailName: highest.name,
       isNew: ordered.some(badge => newBadgeKeys.has(badge.badgeKey)),
     };
   });
@@ -352,6 +357,83 @@ const nextBadgeGuideDialog = window.OSMModal.createDialog({
   labelledBy: 'profile-next-badge-guide-title',
   content: '<div class="app-modal-heading"><div><h2 id="profile-next-badge-guide-title">現在のバッジ条件</h2><p>バッジ名、獲得条件、獲得者数の一覧です。</p></div></div><div class="profile-badge-condition-table-wrap"><table class="profile-badge-condition-table"><thead><tr><th>バッジ</th><th>条件</th><th>獲得者</th></tr></thead><tbody></tbody></table></div>',
 });
+const badgeMappersDialog = window.OSMModal.createDialog({
+  className: 'app-modal profile-badge-mappers-modal',
+  labelledBy: 'profile-badge-mappers-title',
+  describedBy: 'profile-badge-mappers-count',
+  content: '<div class="app-modal-heading"><div><h2 id="profile-badge-mappers-title">バッジ所持者</h2><p id="profile-badge-mappers-count" role="status" aria-live="polite"></p></div></div><div class="app-modal-body profile-badge-mappers-body"><ol id="profile-badge-mappers-list" class="profile-badge-mapper-list mapper-list"></ol></div>',
+});
+let badgeMappersController = null;
+const badgeMappersCache = new Map();
+const badgeMappersModal = new window.OSMModal(badgeMappersDialog, {
+  afterClose: () => {
+    badgeMappersController?.abort();
+    badgeMappersController = null;
+  },
+});
+
+function badgeMapperListItem(row) {
+  const item = element('li');
+  const link = element('a');
+  link.href = `profile.html?uid=${encodeURIComponent(row.uid)}`;
+  const avatar = element('span', 'profile-related-avatar', String(row.name || '?').slice(0, 1).toUpperCase());
+  if (row.avatarUrl) {
+    const image = element('img');
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.addEventListener('load', () => avatar.classList.add('has-image'));
+    image.addEventListener('error', () => image.remove());
+    image.src = row.avatarUrl;
+    avatar.append(image);
+  }
+  link.append(avatar, element('strong', '', row.name || '不明'));
+  item.append(link);
+  return item;
+}
+
+function renderBadgeMappers(data) {
+  const rows = Array.isArray(data.mappers) ? data.mappers : [];
+  const total = Number.isFinite(Number(data.total)) ? Number(data.total) : rows.length;
+  document.querySelector('#profile-badge-mappers-count').textContent =
+    `${numberFormat.format(total)}名のマッパーがこのバッジを所持しています。`;
+  const list = document.querySelector('#profile-badge-mappers-list');
+  list.replaceChildren(...rows.map(badgeMapperListItem));
+  if (!rows.length) list.append(element('li', 'profile-empty', 'このバッジを所持しているマッパーはいません。'));
+}
+
+async function openBadgeMappers(badge, trigger) {
+  const badgeName = badge.detailName || badge.name || badge.badgeKey;
+  document.querySelector('#profile-badge-mappers-title').textContent = `${badge.icon || '🏅'} ${badgeName}`;
+  document.querySelector('#profile-badge-mappers-count').textContent = '所持者を読み込んでいます…';
+  document.querySelector('#profile-badge-mappers-list').replaceChildren();
+  badgeMappersModal.open({returnFocus: trigger, focusTarget: badgeMappersModal.closeButton});
+
+  if (badgeMappersCache.has(badge.badgeKey)) {
+    renderBadgeMappers(badgeMappersCache.get(badge.badgeKey));
+    return;
+  }
+  badgeMappersController?.abort();
+  badgeMappersController = new AbortController();
+  const controller = badgeMappersController;
+  try {
+    const query = new URLSearchParams({mode: 'badge_mappers', badge_key: badge.badgeKey});
+    const response = await fetch(`${apiUrl}?${query}`, {signal: controller.signal});
+    const data = await response.json();
+    if (!response.ok || data.error) throw new Error(data.error || `API: HTTP ${response.status}`);
+    if (controller !== badgeMappersController) return;
+    badgeMappersCache.set(badge.badgeKey, data);
+    renderBadgeMappers(data);
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      document.querySelector('#profile-badge-mappers-count').textContent = `所持者を読み込めませんでした：${error.message}`;
+    }
+  } finally {
+    if (controller === badgeMappersController) badgeMappersController = null;
+  }
+}
+
 setupProfileGuideDialog('#profile-level-guide-open', levelGuideDialog);
 setupProfileGuideDialog('#profile-badge-guide-open', '#profile-badge-guide');
 setupProfileGuideDialog('#profile-next-badge-guide-open', nextBadgeGuideDialog);
