@@ -1,4 +1,4 @@
 {
-  // 相対URLは現在表示している環境（本番／ローカル）のURLを基準に解決
-  "apiUrl": "./api.php"
+  // 各画面で共通して使用するAPIエンドポイント
+  "apiUrl": "https://armd-01.sakura.ne.jp/osm-japan-changes/api.php"
 }
