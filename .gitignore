@@ -1,8 +1,4 @@
-# Database credentials and local environment files
-private-osm-config.php
-private-osm-test-config.php
-**/private-osm-config.php
-**/private-osm-test-config.php
+# Local environment files
 .env
 .env.*
 !.env.example

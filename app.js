@@ -455,9 +455,7 @@ function updateDemoTime(time, now) {
   demoLastTimeUpdateAt = now;
   if (!Number.isFinite(time)) return;
   const date = new Date(time);
-  timelineSummaryDatetime.textContent = fmtTimelineSummary(time);
-  timelineSummaryDatetime.dateTime = date.toISOString();
-  timelineSummaryDatetime.title = fmt(time);
+  updateTimelineSummaryDatetime(time);
   const yearMonthParts = Object.fromEntries(
     demoYearFormatter.formatToParts(date).map(part => [part.type, part.value]),
   );
@@ -792,10 +790,9 @@ function updateTimelineSummary() {
   timelineMapTitle.textContent = `新着情報(${selectedPrefecture || '全国'})`;
   if (!markerEntries.length) {
     timelineSummaryDatetime.textContent = '—';
-    timelineSummaryDatetime.removeAttribute('datetime');
     timelineSummaryDatetime.removeAttribute('title');
   }
-  timelineSummaryCount.textContent = '0件（累積0件）';
+  timelineSummaryCount.textContent = '累積0件';
 }
 
 function updateMapLegend() {
@@ -818,7 +815,17 @@ const fmt = value => {
   }).formatToParts(parseUtcDate(value)).map(part => [part.type, part.value]));
   return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute} (JST)`;
 };
-const fmtTimelineSummary = fmt;
+const fmtTimelineSummary = value => fmt(value).replace(' (JST)', '');
+function updateTimelineSummaryDatetime(selected) {
+  const start = Number(range.min);
+  if (!Number.isFinite(start) || !Number.isFinite(selected)) {
+    timelineSummaryDatetime.textContent = '—';
+    timelineSummaryDatetime.removeAttribute('title');
+    return;
+  }
+  timelineSummaryDatetime.textContent = `${fmtTimelineSummary(start)}〜${fmtTimelineSummary(selected)}`;
+  timelineSummaryDatetime.title = `開始：${fmtTimelineSummary(start)}／選択中：${fmtTimelineSummary(selected)}`;
+}
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 })[character]);
@@ -1762,11 +1769,8 @@ function updateHighlight() {
   if (targetChanged) setListVisibleTarget(visible);
   else renderVirtualList(true);
 
-  const highlighted = Math.max(0, highlightEnd - highlightStart);
-  timelineSummaryDatetime.textContent = fmtTimelineSummary(selected);
-  timelineSummaryDatetime.dateTime = new Date(selected).toISOString();
-  timelineSummaryDatetime.title = fmt(selected);
-  timelineSummaryCount.textContent = `${highlighted.toLocaleString('ja-JP')}件（累積${visible.toLocaleString('ja-JP')}件）`;
+  updateTimelineSummaryDatetime(selected);
+  timelineSummaryCount.textContent = `累積${visible.toLocaleString('ja-JP')}件`;
   status.textContent = `${selectedPrefecture ? `${selectedPrefecture}：` : ''}${markerEntries.length}件中 ${visible}件を表示`;
 }
 function showOsmMenu(entry, syncList = true) {
@@ -1877,7 +1881,7 @@ function setupTimeline(items) {
   const restoredSharedTime = pendingSharedTime !== null;
   const initialTime = restoredSharedTime
     ? Math.min(maximum, Math.max(min, pendingSharedTime))
-    : min;
+    : maximum;
   pendingSharedTime = null;
   highlightRadius = timeStep;
   range.min = String(min);

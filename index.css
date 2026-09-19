@@ -879,7 +879,9 @@
 
 
 .index-page #timeline-summary-datetime {
-  font-size: 16px
+  font-size: 16px;
+  text-align: center;
+  white-space: normal
 }
 
 
@@ -887,6 +889,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   order: 2;
   flex: 0 0 100%;
   gap: 10px
