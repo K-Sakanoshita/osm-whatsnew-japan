@@ -5,6 +5,9 @@
         "*": {
             "*": "-"
         },
+        "addr:block_number": {
+            "*": "街区番号"
+        },
         "advertising": {
             "billboard": "広告看板",
             "board": "広告板",
@@ -25,6 +28,7 @@
             "bicycle_rental": "レンタサイクル",
             "bicycle_repair_station": "自転車修理ステーション",
             "biergarten": "ビアガーデン",
+            "boat_storage": "船舶保管所",
             "boat_rental": "貸しボート",
             "brothel": "売春宿",
             "bureau_de_change": "両替所",
@@ -47,12 +51,15 @@
             "coworking_space": "コワーキングスペース",
             "co-working": "コワーキングスペース",
             "crematorium": "火葬場",
+            "club": "クラブ",
+            "dancing school": "ダンススクール",
             "dancing_school": "ダンススクール",
             "dentist": "歯医者",
             "doctors": "医者",
             "dojo": "道場",
             "drinking_water": "給水所",
             "driving_school": "自動車教習所",
+            "dive_centre": "ダイビングセンター",
             "events_venue": "イベント施設",
             "exhibition_centre": "パビリオン",
             "fast_food": "ファーストフード",
@@ -118,6 +125,7 @@
             "toilets": "トイレ",
             "townhall": "役所",
             "training": "研修・訓練施設",
+            "Shinto shrine": "神社",
             "university": "総合大学",
             "vacuum_cleaner": "車用掃除機",
             "vehicle_inspection": "車両検査場",
@@ -177,6 +185,10 @@
             "roof": "屋根",
             "yes": "建物"
         },
+        "button_operated": {
+            "no": "押しボタンなし",
+            "yes": "押しボタンあり"
+        },
         "cemetery": {
             "sector": "墓地区画"
         },
@@ -205,6 +217,8 @@
             "stonemason": "石工",
             "metal_construction": "金属加工業",
             "dressmaker": "洋裁店",
+            "electronics_repair": "電子機器修理店",
+            "joiner": "木工所",
             "clothes_repair": "衣服修理店",
             "signmaker": "看板製作業"
         },
@@ -212,7 +226,20 @@
             "embassy": "大使館"
         },
         "disused:amenity": {
+            "restaurant": "閉店した飲食店",
             "school": "廃校"
+        },
+        "disused:shop": {
+            "convenience": "閉店したコンビニ"
+        },
+        "currency:JPY": {
+            "yes": "日本円対応"
+        },
+        "direction": {
+            "*": "方角"
+        },
+        "ele": {
+            "*": "標高"
         },
         "emergency": {
             "assembly_point": "避難場所",
@@ -221,6 +248,7 @@
             "fire_hydrant": "消火栓",
             "fire_hose": "消火ホース",
             "fire_lookout": "火の見櫓",
+            "fire_service_inlet": "消防用送水口",
             "defibrillator": "AED",
             "siren": "サイレン",
             "suction_point": "消防水利",
@@ -250,6 +278,7 @@
             "laboratory": "医療検査所",
             "pharmacy": "薬局",
             "physiotherapist": "理学療法施設",
+            "psychotherapist": "心理療法クリニック",
             "hospice": "ホスピス"
         },
         "club": {
@@ -283,6 +312,7 @@
             "engineer": "技術事務所",
             "estate_agent": "不動産屋",
             "financial": "金融事務所",
+            "financial_advisor": "ファイナンシャルアドバイザー",
             "forestry": "林業事務所",
             "foundation": "財団・協会",
             "government": "公共サービス",
@@ -310,7 +340,9 @@
             "cooperative": "協同組合",
             "funeral_director": "葬儀社事務所",
             "construction_company": "建設会社",
-            "private_investigator": "探偵事務所"
+            "private_investigator": "探偵事務所",
+            "quango": "準政府機関",
+            "union": "労働組合"
         },
         "shop": {
             "agrarian": "農協/農業用品店",
@@ -360,7 +392,9 @@
             "fashion_accessories": "ファッション小物店",
             "fishing": "釣具店",
             "florist": "花屋",
+            "fireplace": "暖炉・ストーブ店",
             "food": "食品店",
+            "fuel": "燃料販売店",
             "frozen_food": "冷凍食品専門店",
             "funeral_directors": "葬儀社",
             "furniture": "家具屋",
@@ -378,6 +412,7 @@
             "health_food": "健康食品店",
             "hearing_aids": "補聴器店",
             "herbalist": "薬草店",
+            "hifi": "オーディオ店",
             "hobby": "ホビー用品店",
             "homeopathy": "ホメオパシー用品店",
             "houseware": "家庭用品店",
@@ -403,6 +438,7 @@
             "nutrition_supplements": "栄養補助食品店",
             "optician": "メガネ店",
             "outdoor": "アウトドア用品店",
+            "party": "パーティー用品店",
             "outpost": "オンライン注文受取店",
             "paper": "紙製品店",
             "pasta": "パスタ専門店",
@@ -509,7 +545,8 @@
             "shelter": "一時避難所"
         },
         "sport": {
-            "climbing": "クライミング"
+            "climbing": "クライミング",
+            "tennis": "テニス"
         },
         "playground": {
             "activitypanel": "パネル遊具",
@@ -616,7 +653,8 @@
             "gate": "歴史的な門",
             "fort": "要塞",
             "manor": "歴史的邸宅",
-            "wreck": "難破船"
+            "wreck": "難破船",
+            "*": "史跡"
         },
         "marker": {
             "post": "標識柱"
@@ -649,6 +687,7 @@
             "sign": "看板",
             "silo": "サイロ",
             "storage_tank": "貯蔵タンク",
+            "street_cabinet": "路上設備収納箱",
             "telescope": "望遠鏡",
             "torii": "鳥居",
             "lamp": "灯籠",
@@ -702,6 +741,7 @@
             "park": "公園",
             "picnic_table": "ピクニックテーブル",
             "playground": "児童公園",
+            "schoolyard": "校庭",
             "slipway": "船揚げ場",
             "sports_centre": "スポーツセンター",
             "sports_hall": "体育館",
@@ -723,9 +763,11 @@
             "crossing": "鉄道横断箇所",
             "halt": "鉄道停留所",
             "level_crossing": "踏切",
+            "railway_crossing": "鉄道横断箇所",
             "signal": "鉄道信号機",
             "station": "鉄道駅",
             "subway_entrance": "地下鉄入口",
+            "train_station_entrance": "鉄道駅入口",
             "switch": "分岐器",
             "tram_stop": "路面電車停留所"
         },
@@ -797,10 +839,20 @@
         },
         "waterway": {
             "canal": "運河",
+            "dam": "ダム・堰",
             "lock_gate": "関門",
             "river": "川",
             "stream": "小川",
             "waterfall": "滝"
+        },
+        "name": {
+            "*": "名称"
+        },
+        "noname": {
+            "yes": "名称なし"
+        },
+        "source": {
+            "*": "情報源"
         },
         "suffix_covid19": "(暫定)",
         "bookmarked": "スターつき"

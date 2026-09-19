@@ -8,6 +8,9 @@
             "*": {
                 "*": "marker-stroked.png"
             },
+            "addr:block_number": {
+                "*": "home.png"
+            },
             "advertising": {
                 "billboard": "billboard.png",
                 "board": "billboard.png",
@@ -28,6 +31,7 @@
                 "bicycle_rental": "bicycle_rental.png",
                 "bicycle_repair_station": "bicycle_repair.png",
                 "biergarten": "beer.png",
+                "boat_storage": "boat.png",
                 "brothel": "heart.png",
                 "bureau_de_change": "money_hand.png",
                 "bus_station": "board_bus.png",
@@ -50,11 +54,14 @@
                 "courthouse": "courthouse.png",
                 "coworking_space": "commercial.png",
                 "crematorium": "marker-stroked.png",
+                "club": "users-solid.png",
+                "dancing school": "music.png",
                 "dancing_school": "music.png",
                 "dentist": "dentist.png",
                 "doctors": "doctor.png",
                 "dojo": "pitch.png",
                 "driving_school": "car.png",
+                "dive_centre": "scuba_diving.png",
                 "drinking_water": "drinking-water.png",
                 "exhibition_centre": "museum.png",
                 "events_venue": "users-solid.png",
@@ -121,6 +128,7 @@
                 "toilets": "toilet.png",
                 "townhall": "town-hall.png",
                 "training": "school.png",
+                "Shinto shrine": "shinto.png",
                 "university": "college.png",
                 "vacuum_cleaner": "vacuum.png",
                 "vehicle_inspection": "car-repair.png",
@@ -180,6 +188,10 @@
                 "roof": "home.png",
                 "yes": "home.png"
             },
+            "button_operated": {
+                "no": "traffic_signals.png",
+                "yes": "traffic_signals.png"
+            },
             "cemetery": {
                 "sector": "cemetery.png"
             },
@@ -208,6 +220,8 @@
                 "stonemason": "monument.png",
                 "metal_construction": "anvil_and_hammer.png",
                 "dressmaker": "dress.png",
+                "electronics_repair": "electronic.png",
+                "joiner": "anvil_and_hammer.png",
                 "clothes_repair": "clothes_hanger.png",
                 "signmaker": "map-signs.png"
             },
@@ -215,7 +229,20 @@
                 "embassy": "diplomatic.png"
             },
             "disused:amenity": {
+                "restaurant": "ruins.png",
                 "school": "ruins.png"
+            },
+            "disused:shop": {
+                "convenience": "ruins.png"
+            },
+            "currency:JPY": {
+                "yes": "money_hand.png"
+            },
+            "direction": {
+                "*": "arrow.png"
+            },
+            "ele": {
+                "*": "mountain.png"
             },
             "emergency": {
                 "assembly_point": "assembly_point.png",
@@ -224,6 +251,7 @@
                 "fire_hydrant": "fire_hydrant.png",
                 "fire_hose": "fire_hose.png",
                 "fire_lookout": "fire_lookout_B-14.png",
+                "fire_service_inlet": "fire_hose.png",
                 "defibrillator": "defibrillator.png",
                 "siren": "speaker.png",
                 "suction_point": "powered_pump.png",
@@ -253,6 +281,7 @@
                 "laboratory": "medical_supply.png",
                 "pharmacy": "pharmacy.png",
                 "physiotherapist": "physiotherapist.png",
+                "psychotherapist": "doctor.png",
                 "hospice": "social_facility.png"
             },
             "club": {
@@ -286,6 +315,7 @@
                 "engineer": "tools.png",
                 "estate_agent": "real_estate_agency.png",
                 "financial": "money_hand.png",
+                "financial_advisor": "briefcase_info.png",
                 "forestry": "park.png",
                 "foundation": "briefcase.png",
                 "government": "town_hall.png",
@@ -313,7 +343,9 @@
                 "cooperative": "briefcase_info.png",
                 "funeral_director": "cemetery.png",
                 "construction_company": "construction.png",
-                "private_investigator": "police_officer.png"
+                "private_investigator": "police_officer.png",
+                "quango": "town-hall.png",
+                "union": "users-solid.png"
             },
             "shop": {
                 "agrarian": "agrarian.png",
@@ -355,6 +387,8 @@
                 "erotic": "heart.png",
                 "farm": "apple-alt.png",
                 "florist": "florist.png",
+                "fireplace": "fireplace.png",
+                "fuel": "fuel.png",
                 "fishing": "ice_fishing.png",
                 "frozen_food": "shop.png",
                 "funeral_directors": "cemetery.png",
@@ -367,6 +401,7 @@
                 "hairdresser": "hairdresser.png",
                 "hardware": "tools.png",
                 "health_food": "shop.png",
+                "hifi": "electronic.png",
                 "hobby": "dice.png",
                 "houseware": "blender-solid.png",
                 "ice_cream": "ice-cream.png",
@@ -384,6 +419,7 @@
                 "newsagent": "newspaper-solid.png",
                 "optician": "optician.png",
                 "outdoor": "campsite.png",
+                "party": "shop.png",
                 "outpost": "store.png",
                 "pasta": "restaurant.png",
                 "pastry": "bakery.png",
@@ -512,7 +548,8 @@
                 "shelter": "shelter.png"
             },
             "sport": {
-                "climbing": "climbing.png"
+                "climbing": "climbing.png",
+                "tennis": "tennis.png"
             },
             "playground": {
                 "activitypanel": "playground.png",
@@ -619,7 +656,8 @@
                 "gate": "tall_gate.png",
                 "fort": "castle-JP.png",
                 "manor": "row_houses.png",
-                "wreck": "boat.png"
+                "wreck": "boat.png",
+                "*": "monument.png"
             },
             "marker": {
                 "post": "post.png"
@@ -652,6 +690,7 @@
                 "sign": "map-signs.png",
                 "silo": "silo.png",
                 "storage_tank": "storage_tank.png",
+                "street_cabinet": "utility_pole.png",
                 "telescope": "telescope.png",
                 "survey_point": "benchmark_disk.png",
                 "torii": "shinto.png",
@@ -705,6 +744,7 @@
                 "pitch": "pitch.png",
                 "park": "tree_and_bench.png",
                 "playground": "playground.png",
+                "schoolyard": "school-JP.png",
                 "sauna": "temperature-three-quarters-solid-full.png",
                 "slipway": "slipway.png",
                 "sports_centre": "gym.png",
@@ -726,9 +766,11 @@
                 "crossing": "crossing_rail_road.png",
                 "halt": "train.png",
                 "level_crossing": "crossing_rail_road.png",
+                "railway_crossing": "crossing_rail_road.png",
                 "signal": "railway_signals.png",
                 "station": "train.png",
                 "subway_entrance": "subway.png",
+                "train_station_entrance": "entrance.png",
                 "switch": "railway_track_askew.png",
                 "tram_stop": "tram.png"
             },
@@ -800,6 +842,7 @@
             },
             "waterway": {
                 "canal": "water.png",
+                "dam": "dam.png",
                 "lock_gate": "dam.png",
                 "river": "water.png",
                 "stream": "water.png",
@@ -807,6 +850,15 @@
             },
             "wikipedia": {
                 "*": "wikipedia.png"
+            },
+            "name": {
+                "*": "marker.png"
+            },
+            "noname": {
+                "yes": "information.png"
+            },
+            "source": {
+                "*": "information.png"
             }
         },
         "subtag": {

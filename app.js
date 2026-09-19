@@ -1815,19 +1815,20 @@ function showOsmMenu(entry, syncList = true) {
 
   const categoryTag = `${entry.item.type}=${entry.item.kind || '—'}`;
   const categoryDetail = document.createElement('span');
-  categoryDetail.className = 'osm-menu-category-detail';
-  categoryDetail.append(`${entry.item.categoryName}（${categoryTag}）`);
+  categoryDetail.append(`${entry.item.categoryName}（`);
   if (entry.item.type && entry.item.kind) {
     const wikiLink = document.createElement('a');
-    wikiLink.className = 'osm-menu-wiki-link';
     wikiLink.href = `https://wiki.openstreetmap.org/wiki/Tag:${encodeURIComponent(`${entry.item.type}=${entry.item.kind}`)}`;
     wikiLink.target = '_blank';
     wikiLink.rel = 'noopener noreferrer';
-    wikiLink.textContent = 'i';
+    wikiLink.textContent = categoryTag;
     wikiLink.setAttribute('aria-label', `${categoryTag}のOSM Wikiを新しいタブで開く`);
     wikiLink.title = `${categoryTag}のOSM Wikiを開く`;
     categoryDetail.append(wikiLink);
+  } else {
+    categoryDetail.append(categoryTag);
   }
+  categoryDetail.append('）');
   addDetail('種別', categoryDetail);
   addDetail('更新種別', entry.item.action === 'create' ? '新規' : '更新');
   addDetail('更新時間', fmt(entry.item.date));

@@ -5,6 +5,9 @@
         "*": {
             "*": "-"
         },
+        "addr:block_number": {
+            "*": "block number"
+        },
         "advertising": {
             "billboard": "billboard",
             "board": "advertising board",
@@ -25,6 +28,7 @@
             "bicycle_rental": "bicycle rental",
             "bicycle_repair_station": "bicycle repair station",
             "biergarten": "biergarten",
+            "boat_storage": "boat storage",
             "boat_rental": "boat rental",
             "brothel": "brothel",
             "bureau_de_change": "money exchange ",
@@ -47,12 +51,15 @@
             "co-working": "coworking space",
             "coworking_space": "coworking space",
             "crematorium": "crematorium",
+            "club": "club",
+            "dancing school": "dance school",
             "dancing_school": "dancing school",
             "dentist": "dentist",
             "doctors": "doctor",
             "dojo": "dojo",
             "drinking_water": "drinking water",
             "driving_school": "driving school",
+            "dive_centre": "diving centre",
             "events_venue": "events venue",
             "exhibition_centre": "exhibition centre/Pavilion",
             "fast_food": "fast food",
@@ -118,6 +125,7 @@
             "toilets": "toilets",
             "townhall": "town hall",
             "training": "training centre",
+            "Shinto shrine": "Shinto shrine",
             "university": "university",
             "vacuum_cleaner": "vehicle vacuum cleaner",
             "vehicle_inspection": "vehicle inspection",
@@ -177,6 +185,10 @@
             "roof": "roof",
             "yes": "building"
         },
+        "button_operated": {
+            "no": "no push button",
+            "yes": "push button"
+        },
         "cemetery": {
             "sector": "cemetery sector"
         },
@@ -205,6 +217,8 @@
             "stonemason": "stonemason",
             "metal_construction": "metal construction",
             "dressmaker": "dressmaker",
+            "electronics_repair": "electronics repair",
+            "joiner": "joiner",
             "clothes_repair": "clothes repair",
             "signmaker": "signmaker"
         },
@@ -212,7 +226,20 @@
             "embassy": "embassy"
         },
         "disused:amenity": {
+            "restaurant": "closed restaurant",
             "school": "school(disused)"
+        },
+        "disused:shop": {
+            "convenience": "closed convenience store"
+        },
+        "currency:JPY": {
+            "yes": "Japanese yen accepted"
+        },
+        "direction": {
+            "*": "direction"
+        },
+        "ele": {
+            "*": "elevation"
         },
         "emergency": {
             "assembly_point": "assembly point",
@@ -221,6 +248,7 @@
             "fire_hydrant": "hydrant",
             "fire_hose": "hose",
             "fire_lookout": "fire lookout",
+            "fire_service_inlet": "fire service inlet",
             "defibrillator": "AED",
             "siren": "siren",
             "suction_point": "suction point",
@@ -236,6 +264,7 @@
             "laboratory": "medical laboratory",
             "pharmacy": "pharmacy",
             "physiotherapist": "physiotherapist",
+            "psychotherapist": "psychotherapist",
             "hospice": "hospice"
         },
         "club": {
@@ -283,6 +312,7 @@
             "engineer": "engineering office",
             "estate_agent": "estate agent",
             "financial": "financial office",
+            "financial_advisor": "financial advisor",
             "forestry": "forestry office",
             "foundation": "foundation",
             "government": "government",
@@ -310,7 +340,9 @@
             "cooperative": "cooperative office",
             "funeral_director": "funeral director office",
             "construction_company": "construction company",
-            "private_investigator": "private investigator"
+            "private_investigator": "private investigator",
+            "quango": "quasi-governmental organisation",
+            "union": "trade union"
         },
         "shop": {
             "agrarian": "agrarian",
@@ -360,7 +392,9 @@
             "fashion_accessories": "fashion accessories",
             "fishing": "fishing tackle shop",
             "florist": "florist",
+            "fireplace": "fireplace shop",
             "food": "food shop",
+            "fuel": "fuel shop",
             "frozen_food": "frozen food",
             "funeral_directors": "cemetery",
             "furniture": "furniture",
@@ -378,6 +412,7 @@
             "health_food": "health food",
             "hearing_aids": "hearing aids",
             "herbalist": "herbalist",
+            "hifi": "hi-fi shop",
             "hobby": "hobby shop",
             "homeopathy": "homeopathy shop",
             "houseware": "houseware",
@@ -403,6 +438,7 @@
             "nutrition_supplements": "nutrition supplements",
             "optician": "optician",
             "outdoor": "outdoor shop",
+            "party": "party supplies shop",
             "outpost": "online order pickup shop",
             "paper": "paper shop",
             "pasta": "pasta",
@@ -449,7 +485,7 @@
             "water": "water",
             "wholesale": "wholesale shop",
             "wine": "wine",
-            "yes": "shop",
+            "yes": "shop"
         },
         "natural": {
             "beach": "beach",
@@ -509,7 +545,8 @@
             "shelter": "temporary shelter"
         },
         "sport": {
-            "climbing": "climbing"
+            "climbing": "climbing",
+            "tennis": "tennis"
         },
         "playground": {
             "activitypanel": "activitypanel",
@@ -616,7 +653,8 @@
             "gate": "historic gate",
             "fort": "fort",
             "manor": "historic manor",
-            "wreck": "wreck"
+            "wreck": "wreck",
+            "*": "historic feature"
         },
         "marker": {
             "post": "marker post"
@@ -649,6 +687,7 @@
             "sign": "sign",
             "silo": "silo",
             "storage_tank": "storage tank",
+            "street_cabinet": "street cabinet",
             "telescope": "telescope",
             "torii": "torii",
             "lamp": "lantern",
@@ -702,6 +741,7 @@
             "park": "park",
             "picnic_table": "picnic table",
             "playground": "playground",
+            "schoolyard": "schoolyard",
             "slipway": "slipway",
             "sports_centre": "sports centre",
             "sports_hall": "sports hall",
@@ -723,9 +763,11 @@
             "crossing": "railway crossing",
             "halt": "railway halt",
             "level_crossing": "level crossing",
+            "railway_crossing": "railway crossing",
             "signal": "railway signal",
             "station": "station",
             "subway_entrance": "subway entrance",
+            "train_station_entrance": "train station entrance",
             "switch": "railway switch",
             "tram_stop": "tram stop"
         },
@@ -797,10 +839,20 @@
         },
         "waterway": {
             "canal": "canal",
+            "dam": "dam",
             "lock_gate": "lock gate",
             "river": "river",
             "stream": "stream",
             "waterfall": "waterfall"
+        },
+        "name": {
+            "*": "name"
+        },
+        "noname": {
+            "yes": "unnamed feature"
+        },
+        "source": {
+            "*": "source"
         },
         "suffix_covid19": "(provisional)",
         "bookmarked": "Starred"
