@@ -14,7 +14,7 @@ const WIDE_MAP_BOUNDS = [[115, 4], [155, 46]];
 const MAP_MOVEMENT_BOUNDS = [[110, 2], [170, 60]];
 const WIDE_MAP_CENTER = [135, 32.5];
 const WIDE_MAP_ZOOM = 3.15;
-const NORMAL_MAP_STYLE = './tiles/osmfj_nopoi.json';
+const NORMAL_MAP_STYLE = './tiles/osmfj_poi.json';
 const NIGHTSCAPE_MAP_STYLE = './tiles/osmfj_nightscape.json';
 const initialMapView = window.osmSharedMapView.read({
   fallbackCenter: WIDE_MAP_CENTER,
@@ -79,6 +79,7 @@ const listScroller = list;
 const poiTypeSelect = document.querySelector('#poi-type');
 const timeline = document.querySelector('#timeline');
 const range = document.querySelector('#time-range');
+const timelineRangeControl = document.querySelector('.timeline-range-control');
 const timelineRangeRow = document.querySelector('.timeline-range-row');
 const timelineResetButton = document.querySelector('#timeline-reset');
 const timelineMapTitle = document.querySelector('#timeline-map-title');
@@ -394,7 +395,7 @@ function setMapStyle(styleUrl) {
     const started = performance.now();
     const expectedName = styleUrl === NIGHTSCAPE_MAP_STYLE
       ? 'OpenStreetMap NIGHTSCAPE'
-      : 'OpenStreetMap(with out poi)';
+      : 'OpenStreetMap(with poi)';
     const check = () => {
       if (map.getStyle()?.name === expectedName && map.isStyleLoaded()) {
         resolve();
@@ -451,6 +452,7 @@ function setupDemoRuler() {
 
 function updateDemoTime(time, now) {
   range.value = String(time);
+  updateTimelineRangeProgress();
   if (now - demoLastTimeUpdateAt < 200) return;
   demoLastTimeUpdateAt = now;
   if (!Number.isFinite(time)) return;
@@ -1452,11 +1454,13 @@ function animateRange(from, to, duration, done) {
     const progress = Math.min(1, (now - startedAt) / duration);
     const eased = 1 - Math.pow(1 - progress, 3);
     range.value = String(from + (to - from) * eased);
+    updateTimelineRangeProgress();
     if (progress < 1) {
       playbackFrame = requestAnimationFrame(frame);
     } else {
       playbackFrame = null;
       range.value = String(to);
+      updateTimelineRangeProgress();
       updateHighlight();
       waitForMapIdle(done);
     }
@@ -1753,6 +1757,7 @@ function scrollListToVisiblePoi(visible) {
 
 function updateHighlight() {
   const selected = Number(range.value);
+  updateTimelineRangeProgress();
   const visible = upperBound(selected);
   const highlightStart = lowerBound(selected - highlightRadius);
   const highlightEnd = visible;
@@ -1772,6 +1777,17 @@ function updateHighlight() {
   updateTimelineSummaryDatetime(selected);
   timelineSummaryCount.textContent = `累積${visible.toLocaleString('ja-JP')}件`;
   status.textContent = `${selectedPrefecture ? `${selectedPrefecture}：` : ''}${markerEntries.length}件中 ${visible}件を表示`;
+}
+
+function updateTimelineRangeProgress() {
+  const minimum = Number(range.min);
+  const maximum = Number(range.max);
+  const selected = Number(range.value);
+  const span = maximum - minimum;
+  const progress = span > 0 && Number.isFinite(selected)
+    ? Math.min(1, Math.max(0, (selected - minimum) / span))
+    : 0;
+  timelineRangeControl.style.setProperty('--timeline-range-progress', String(progress));
 }
 function showOsmMenu(entry, syncList = true) {
   if (activeListItem) activeListItem.classList.remove('is-selected');
@@ -1797,7 +1813,22 @@ function showOsmMenu(entry, syncList = true) {
     details.append(term, description);
   };
 
-  addDetail('種別', `${entry.item.categoryName}（${entry.item.type}=${entry.item.kind || '—'}）`);
+  const categoryTag = `${entry.item.type}=${entry.item.kind || '—'}`;
+  const categoryDetail = document.createElement('span');
+  categoryDetail.className = 'osm-menu-category-detail';
+  categoryDetail.append(`${entry.item.categoryName}（${categoryTag}）`);
+  if (entry.item.type && entry.item.kind) {
+    const wikiLink = document.createElement('a');
+    wikiLink.className = 'osm-menu-wiki-link';
+    wikiLink.href = `https://wiki.openstreetmap.org/wiki/Tag:${encodeURIComponent(`${entry.item.type}=${entry.item.kind}`)}`;
+    wikiLink.target = '_blank';
+    wikiLink.rel = 'noopener noreferrer';
+    wikiLink.textContent = 'i';
+    wikiLink.setAttribute('aria-label', `${categoryTag}のOSM Wikiを新しいタブで開く`);
+    wikiLink.title = `${categoryTag}のOSM Wikiを開く`;
+    categoryDetail.append(wikiLink);
+  }
+  addDetail('種別', categoryDetail);
   addDetail('更新種別', entry.item.action === 'create' ? '新規' : '更新');
   addDetail('更新時間', fmt(entry.item.date));
 

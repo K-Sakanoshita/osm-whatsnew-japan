@@ -897,7 +897,10 @@
 
 
 .index-page .timeline-summary-time-row #timeline-summary-count {
-  margin: 0
+  align-self: center;
+  height: 30px;
+  margin: 0;
+  line-height: normal
 }
 
 
@@ -987,9 +990,92 @@
 }
 
 
-.index-page .timeline-range-row #time-range {
+.index-page .timeline-range-control {
+  --timeline-range-progress: 0;
+  position: relative;
   min-width: 0;
+  height: 30px;
   flex: 1
+}
+
+
+.index-page .timeline-range-control::before,
+.index-page .timeline-range-control::after {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: 8px;
+  left: 8px;
+  height: 6px;
+  border-radius: 999px;
+  content: '';
+  pointer-events: none;
+  transform: translateY(-50%)
+}
+
+
+.index-page .timeline-range-control::before {
+  background: #44494c
+}
+
+
+.index-page .timeline-range-control::after {
+  background: #e6a700;
+  transform: translateY(-50%) scaleX(var(--timeline-range-progress));
+  transform-origin: left center
+}
+
+
+.index-page .timeline-range-row #time-range {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent
+}
+
+
+.index-page .timeline-range-row #time-range::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent
+}
+
+
+.index-page .timeline-range-row #time-range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  appearance: none;
+  background: #e6a700
+}
+
+
+.index-page .timeline-range-row #time-range::-moz-range-track,
+.index-page .timeline-range-row #time-range::-moz-range-progress {
+  height: 6px;
+  border: 0;
+  background: transparent
+}
+
+
+.index-page .timeline-range-row #time-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: #e6a700
+}
+
+
+.index-page .timeline-range-row #time-range:focus-visible {
+  outline: 2px solid #0b654f;
+  outline-offset: 2px;
+  border-radius: 999px
 }
 
 
@@ -1276,6 +1362,40 @@
 
 .index-page .osm-menu-details a {
   color: #155e4a
+}
+
+
+.index-page .osm-menu-category-detail {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px
+}
+
+
+.index-page .osm-menu-details .osm-menu-wiki-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  text-decoration: none
+}
+
+
+.index-page .osm-menu-details .osm-menu-wiki-link:hover,
+.index-page .osm-menu-details .osm-menu-wiki-link:focus-visible {
+  color: #fff;
+  background: #155e4a;
+  outline: none
 }
 
 

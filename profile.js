@@ -513,7 +513,7 @@ async function renderActivityMap(rows) {
   }
   activityMap = new maplibregl.Map({
     container,
-    style: './tiles/osmfj_nopoi.json',
+    style: './tiles/osmfj_poi.json',
     ...(locations.length === 1
       ? {center: locations[0].point, zoom: 6.2}
       : {center: [137, 35.5], zoom: 3.2}),
@@ -774,7 +774,7 @@ async function initializeDirectory() {
     zoom: 4.15,
     maxZoom: 8,
     maxBounds: [[118, 18], [158, 50]],
-    style: './tiles/osmfj_nopoi.json',
+    style: './tiles/osmfj_poi.json',
     locale: window.osmSharedMapControls.locale,
   });
   window.osmSharedMapControls.add(directoryMap);

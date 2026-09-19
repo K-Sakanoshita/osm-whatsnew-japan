@@ -204,7 +204,7 @@ function initializePrefectureMap(geojson) {
     maxZoom: 7,
     maxBounds: [[118, 18], [158, 50]],
     fadeDuration: 0,
-    style: './tiles/osmfj_nopoi.json',
+    style: './tiles/osmfj_poi.json',
     locale: window.osmSharedMapControls.locale,
   });
   window.osmSharedMapControls.add(prefectureMap);

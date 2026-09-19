@@ -45,6 +45,7 @@
                 "college": "college.png",
                 "community_centre": "town-hall.png",
                 "compressed_air": "powered_pump.png",
+                "conference_centre": "user-tie-solid-full.png",
                 "co-working": "commercial.png",
                 "courthouse": "courthouse.png",
                 "coworking_space": "commercial.png",
@@ -119,6 +120,7 @@
                 "ticket_validator": "ticket.png",
                 "toilets": "toilet.png",
                 "townhall": "town-hall.png",
+                "training": "school.png",
                 "university": "college.png",
                 "vacuum_cleaner": "vacuum.png",
                 "vehicle_inspection": "car-repair.png",
@@ -254,7 +256,8 @@
                 "hospice": "social_facility.png"
             },
             "club": {
-                "sport": "gym.png"
+                "sport": "gym.png",
+                "yes": "users-solid.png"
             },
             "crossing": {
                 "informal": "pedestrian.png",
@@ -388,6 +391,7 @@
                 "photo": "photo.png",
                 "religion": "shop.png",
                 "rice": "shop.png",
+                "scuba_diving": "scuba_diving.png",
                 "seafood": "restaurant-seafood.png",
                 "second_hand": "second_hand.png",
                 "shoes": "shoe.png",
@@ -395,7 +399,9 @@
                 "sports": "pitch.png",
                 "stationery": "school.png",
                 "storage_rental": "storage_rental.png",
+                "sunglasses": "optician.png",
                 "supermarket": "grocery.png",
+                "tattoo": "tattoo_machine.png",
                 "tailor": "needle_and_spool.png",
                 "tea": "teahouse.png",
                 "ticket": "ticket.png",
@@ -487,12 +493,20 @@
                 "rest_area": "highway-rest-area.png",
                 "services": "highway-rest-area.png",
                 "speed_camera": "security_camera.png",
+                "corridor": "pedestrian.png",
                 "stop": "stop.png",
                 "traffic_signals": "signal.png",
                 "steps": "steps.png",
                 "street_lamp": "street_lamp_arm.png",
                 "elevator": "elevator.png",
                 "turning_circle": "junction.png"
+            },
+            "indoor": {
+                "room": "room.png",
+                "area": "pedestrian.png",
+                "corridor": "pedestrian.png",
+                "wall": "wall.png",
+                "door": "entrance.png"
             },
             "social_facility": {
                 "shelter": "shelter.png"
@@ -602,6 +616,7 @@
                 "mine": "mineshaft_profile.png",
                 "mine_shaft": "mineshaft_cage.png",
                 "city_gate": "city.png",
+                "gate": "tall_gate.png",
                 "fort": "castle-JP.png",
                 "manor": "row_houses.png",
                 "wreck": "boat.png"
@@ -637,7 +652,6 @@
                 "sign": "map-signs.png",
                 "silo": "silo.png",
                 "storage_tank": "storage_tank.png",
-                "street_cabinet": "power_cb2.png",
                 "telescope": "telescope.png",
                 "survey_point": "benchmark_disk.png",
                 "torii": "shinto.png",
